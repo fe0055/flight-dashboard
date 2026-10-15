@@ -18,8 +18,8 @@ jobs:
           import asyncio, datetime
           from playwright.async_api import async_playwright
           async def main():
-              date=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-4))).date().isoformat()
-              url=f'https://www.southwest.com/air/flight-status/path.html?departureDate={date}&flightNumber=1933'
+              date='2026-10-15'
+              url=f'https://www.southwest.com/air/flight-status/path.html?departureDate={date}&flightNumber=2728'
               async with async_playwright() as p:
                   browser=await p.chromium.launch(headless=True)
                   page=await browser.new_page(viewport={'width':1280,'height':800},locale='en-US')
@@ -33,7 +33,8 @@ jobs:
                       print('Final URL:',page.url.split('?')[0])
                       text=(await page.locator('body').inner_text(timeout=8000))[:3500]
                       print('Visible text excerpt:',repr(text))
-                      print('Flight number in page:', '1933' in text)
+                      print('Flight number in page:', '2728' in text)
+                      print('Southwest error displayed:', 'unable to process your request' in text.lower())
                       print('Network response statuses:',responses[:35])
                   except Exception as e:
                       print('Browser error:',type(e).__name__,str(e)[:250])

@@ -1,0 +1,33 @@
+{
+  "source": "AeroDataBox",
+  "retrievedAt": "2026-10-15T04:32:03.981123+00:00",
+  "flights": [
+    {
+      "number": "WN2728",
+      "date": "2026-10-15",
+      "status": "Unknown",
+      "departure": {
+        "iata": "MCO",
+        "scheduled": {
+          "utc": "2026-10-15 10:20Z",
+          "local": "2026-10-15 06:20-04:00"
+        },
+        "terminal": "A",
+        "gate": null
+      },
+      "arrival": {
+        "iata": "BWI",
+        "scheduled": {
+          "utc": "2026-10-15 12:45Z",
+          "local": "2026-10-15 08:45-04:00"
+        },
+        "predicted": {
+          "utc": "2026-10-15 12:26Z",
+          "local": "2026-10-15 08:26-04:00"
+        },
+        "terminal": null,
+        "gate": null
+      }
+    }
+  ]
+}

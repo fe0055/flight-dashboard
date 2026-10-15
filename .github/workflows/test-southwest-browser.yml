@@ -1,0 +1,43 @@
+name: Test Southwest browser rendering
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Install browser
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Open public flight-status page in Chromium
+        run: |
+          python - <<'PY'
+          import asyncio, datetime
+          from playwright.async_api import async_playwright
+          async def main():
+              date=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-4))).date().isoformat()
+              url=f'https://www.southwest.com/air/flight-status/path.html?departureDate={date}&flightNumber=1933'
+              async with async_playwright() as p:
+                  browser=await p.chromium.launch(headless=True)
+                  page=await browser.new_page(viewport={'width':1280,'height':800},locale='en-US')
+                  responses=[]
+                  page.on('response',lambda r: responses.append((r.status,r.url.split('?')[0])) if 'southwest.com' in r.url else None)
+                  try:
+                      response=await page.goto(url,wait_until='domcontentloaded',timeout=35000)
+                      await page.wait_for_timeout(9000)
+                      print('Navigation HTTP:',response.status if response else 'none')
+                      print('Page title:',(await page.title())[:160])
+                      print('Final URL:',page.url.split('?')[0])
+                      text=(await page.locator('body').inner_text(timeout=8000))[:3500]
+                      print('Visible text excerpt:',repr(text))
+                      print('Flight number in page:', '1933' in text)
+                      print('Network response statuses:',responses[:35])
+                  except Exception as e:
+                      print('Browser error:',type(e).__name__,str(e)[:250])
+                  finally:
+                      await browser.close()
+          asyncio.run(main())
+          PY

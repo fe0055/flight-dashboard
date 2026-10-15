@@ -30,8 +30,13 @@ jobs:
                       print('Buttons:',[(await b.inner_text())[:65] for b in buttons[:25]])
                       inputs=await page.locator('input').evaluate_all("(els)=>els.map(e=>({name:e.name,id:e.id,placeholder:e.placeholder,type:e.type,outer:e.outerHTML.slice(0,220)}))")
                       print('Inputs before:',inputs[:20])
-                      tab=page.get_by_text('Search by flight #',exact=False).first
-                      if await tab.count(): await tab.click(timeout=8000)
+                      tab=page.get_by_text('Search by flight #',exact=True).locator('visible=true')
+                      print('Visible search-by-flight tab count:',await tab.count())
+                      if await tab.count(): await tab.first.click(timeout=8000)
+                      else:
+                          candidates=await page.locator('[role=tab], [role=radio], label').evaluate_all('(els)=>els.map(e=>({text:e.innerText.slice(0,90),html:e.outerHTML.slice(0,400)})).filter(x=>/flight/i.test(x.text))')
+                          print('Flight search controls:',candidates[:12])
+                          await page.get_by_label('Search by flight number').first.click(timeout=8000)
                       await page.wait_for_timeout(1000)
                       inputs=await page.locator('input').evaluate_all("(els)=>els.map(e=>({name:e.name,id:e.id,placeholder:e.placeholder,type:e.type,outer:e.outerHTML.slice(0,220)}))")
                       print('Inputs after tab:',inputs[:20])
@@ -40,13 +45,20 @@ jobs:
                       for i in range(await fields.count()):
                           el=fields.nth(i)
                           print('Visible field:',i,await el.get_attribute('placeholder'),await el.get_attribute('type'),await el.get_attribute('name'))
-                      flight=page.get_by_label('Flight #',exact=False)
+                      flight=page.locator('#flightNumber')
                       if await flight.count():
                           await flight.first.fill('2728')
                           print('Flight entered via label')
                       else:
                           print('No labeled flight field; cannot safely submit')
                           return
+                      datefield=page.locator('#departureDate')
+                      if await datefield.count():
+                          print('Date field current:',await datefield.input_value())
+                          if not await datefield.input_value():
+                              await datefield.fill('10/15/2026')
+                              await datefield.press('Tab')
+                          print('Date field after:',await datefield.input_value())
                       print('Before submit:',repr((await page.locator('body').inner_text())[:1600]))
                       search=page.get_by_role('button',name='Search',exact=True)
                       if await search.count():

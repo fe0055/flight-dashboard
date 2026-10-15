@@ -1,0 +1,30 @@
+name: Check published dashboard version
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare deployed HTML with GitHub source
+        run: |
+          python3 - <<'PY'
+          import urllib.request,time
+          base='https://fe0055.github.io/flight-dashboard/'
+          for i in range(3):
+              req=urllib.request.Request(base+'?check='+str(int(time.time())),headers={'Cache-Control':'no-cache','User-Agent':'Mozilla/5.0'})
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as r:
+                      html=r.read().decode('utf-8','replace')
+                      print('HTTP:',r.status,'bytes:',len(html))
+                      print('Has new diagnostics:', 'Times loaded:' in html)
+                      print('Has corrected clock parser:', 'const clock=x=>' in html)
+                      print('Has flight cache loader:', 'loadCachedFlight()' in html)
+                      print('Last modified:',r.headers.get('Last-Modified'))
+                      print('ETag:',r.headers.get('ETag'))
+                      break
+              except Exception as e:
+                  print('Attempt',i+1,type(e).__name__,str(e)[:160])
+                  time.sleep(5)
+          PY

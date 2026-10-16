@@ -36,22 +36,14 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
  el('wxName').textContent=iata+' weather · loading';
  const parseWind=p=>{
   if(!p)return null;
-  let d=p.windDirection?.value,v=p.windSpeed?.value,g=p.windGust?.value;
-  const raw=String(p.rawMessage||'');
+  // Use the wind group from the original METAR only; never infer knots from
+  // converted NWS values when the original report is unavailable.
+  const raw=String(p.rawMessage||'').toUpperCase();
   const m=raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
-  // METAR wind is already in knots; use it before converted NWS fields.
-  const toKnots=field=>{
-   if(typeof field?.value!=='number')return null;
-   const unit=String(field.unitCode||'').toLowerCase();
-   const factor=unit.includes('km_h')||unit.includes('km/h')?0.539957:unit.includes('m_s-1')||unit.includes('m/s')?1.943844:unit.includes('kn')?1:unit.includes('mi_h')?0.868976:null;
-   return factor===null?null:Math.round(field.value*factor);
-  };
-  let speed=m?Number(m[2]):toKnots(p.windSpeed);
-  let gust=m?.[3]?Number(m[3]):toKnots(p.windGust);
-  if(m)d=m[1]==='VRB'?null:Number(m[1]);
-  if(speed===null)return null;
-  const calm=speed===0,variable=m?.[1]==='VRB';
-  return {d,speed,gust,calm,variable,stamp:p.timestamp};
+  if(!m)return null;
+  const speed=Number(m[2]),gust=m[3]?Number(m[3]):null;
+  const variable=m[1]==='VRB',d=variable?null:Number(m[1]);
+  return {d,speed,gust,calm:speed===0,variable,stamp:p.timestamp};
  };
  try{
   const base='https://api.weather.gov/stations/'+encodeURIComponent(icao)+'/observations';

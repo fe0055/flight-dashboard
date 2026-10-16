@@ -7,11 +7,11 @@
   const data=await response.json();
   if(!response.ok)throw Error(data.error||'Flight lookup failed ('+response.status+')');
   if(current!==number||day()!==date)return;
-  const flights=(Array.isArray(data)?data:[]).filter(f=>String(f.number||'').replace(/\s/g,'').toUpperCase()==='WN'+String(Number(number)));
+  const flights=(Array.isArray(data)?data:(Array.isArray(data.flights)?data.flights:[])).filter(f=>String(f.number||'').replace(/\s/g,'').toUpperCase()==='WN'+String(Number(number)));
   if(!flights.length)throw Error('No matching Southwest flight found today');
   let f=flights[0];
   if(flights.length>1){
-   const choices=flights.map((x,i)=>(i+1)+': '+(x.departure?.airport?.iata||'?')+' → '+(x.arrival?.airport?.iata||'?')+' ('+(x.departure?.scheduledTime?.local||'time unavailable')+')').join('\n');
+   const choices=flights.map((x,i)=>(i+1)+': '+(x.departure?.airport?.iata||x.departure?.iata||'?')+' → '+(x.arrival?.airport?.iata||x.arrival?.iata||'?')+' ('+(x.departure?.scheduledTime?.local||x.departure?.scheduled?.local||'time unavailable')+')').join('\n');
    const selected=prompt('Multiple flights found. Enter a number:\n'+choices,'1');
    if(selected===null){status.textContent='Flight selection cancelled.';return;}
    const idx=Number(selected)-1;
@@ -19,18 +19,18 @@
    f=flights[idx];
   }
   const dep=f.departure||{},arr=f.arrival||{};
-  if(!/^[A-Z]{3}$/.test(dep.airport?.iata||'')||!/^[A-Z]{3}$/.test(arr.airport?.iata||''))throw Error('Airport information unavailable');
-  record.dep=dep.airport.iata;record.arr=arr.airport.iata;
+  if(!/^[A-Z]{3}$/.test((dep.airport?.iata||dep.iata||''))||!/^[A-Z]{3}$/.test((arr.airport?.iata||arr.iata||'')))throw Error('Airport information unavailable');
+  record.dep=dep.airport?.iata||dep.iata;record.arr=arr.airport?.iata||arr.iata;
   const clock=x=>{const m=String(x||'').match(/(?:T|\s)(\d{2}:\d{2})/);return m?m[1]:''};
   const zulu=x=>{const t=clock(x);return t?t+'Z':''};
-  record.etd=clock(dep.revisedTime?.local)||clock(dep.scheduledTime?.local)||'';
-  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu(dep.scheduledTime?.utc)||'';
-  record.eta=clock(arr.revisedTime?.local)||clock(arr.predictedTime?.local)||clock(arr.scheduledTime?.local)||'';
-  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu(arr.predictedTime?.utc)||zulu(arr.scheduledTime?.utc)||'';
+  record.etd=clock(dep.revisedTime?.local)||clock((dep.scheduledTime||dep.scheduled)?.local)||'';
+  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||'';
+  record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock((arr.scheduledTime||arr.scheduled)?.local)||'';
+  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||'';
   record.depGate=dep.gate||'';record.arrGate=arr.gate||'';
   record.depRwy=dep.runway||'';record.arrRwy=arr.runway||'';
   put('flight_'+date+'_WN'+number,record);show();
-  status.textContent='AeroDataBox · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||'time unknown')+'. Verify operational details with Southwest.';
+  status.textContent='AeroDataBox · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||data.retrievedAt||'time unknown')+'. Verify operational details with Southwest.';
  }catch(e){status.textContent='Automatic lookup unavailable: '+e.message+'. Manual details still work.';}
 }
 el('autoImport').addEventListener('click',loadCachedFlight);

@@ -40,8 +40,14 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
   const raw=String(p.rawMessage||'');
   const m=raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
   // METAR wind is already in knots; use it before converted NWS fields.
-  let speed=m?Number(m[2]):typeof v==='number'?Math.round(v*1.94384):null;
-  let gust=m?.[3]?Number(m[3]):typeof g==='number'?Math.round(g*1.94384):null;
+  const toKnots=field=>{
+   if(typeof field?.value!=='number')return null;
+   const unit=String(field.unitCode||'').toLowerCase();
+   const factor=unit.includes('km_h')||unit.includes('km/h')?0.539957:unit.includes('m_s-1')||unit.includes('m/s')?1.943844:unit.includes('kn')?1:unit.includes('mi_h')?0.868976:null;
+   return factor===null?null:Math.round(field.value*factor);
+  };
+  let speed=m?Number(m[2]):toKnots(p.windSpeed);
+  let gust=m?.[3]?Number(m[3]):toKnots(p.windGust);
   if(m)d=m[1]==='VRB'?null:Number(m[1]);
   if(speed===null)return null;
   const calm=speed===0,variable=m?.[1]==='VRB';

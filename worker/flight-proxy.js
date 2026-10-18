@@ -23,13 +23,16 @@ function trimAirport(a) {
     iata: typeof a?.airport?.iata === 'string' ? a.airport.iata.toUpperCase() : null,
     scheduled: a?.scheduledTime || null,
     predicted: a?.predictedTime || null,
-    gate: a?.gate || null,
+    gate: gateOf(a) || gateOf(a?.airport) || null,
     terminal: a?.terminal || null
   };
 }
 function gateOf(m) {
-  const g=m?.gate;
-  return typeof g==='string'&&g.trim()?g.trim():null;
+  const g=m?.gate ?? m?.gateNumber ?? m?.boardingGate ?? m?.gateInfo;
+  if(typeof g==='string'&&g.trim())return g.trim();
+  if(typeof g==='number')return String(g);
+  if(g&&typeof g==='object')return gateOf(g);
+  return null;
 }
 function flightNumberMatches(f,number) {
   const candidates=[f.number,f.flightNumber,f.flight?.number,f.airline?.iata&&f.number?f.airline.iata+f.number:null];
@@ -82,7 +85,7 @@ export default {
       return respond({error:'Invalid flight number or date'},400);
     if (!env.AERODATABOX_API_KEY) return respond({error:'API secret not configured'},503);
     // Cache repeated lookups for 15 minutes to conserve API quota.
-    const cacheKey = new Request('https://flight-dashboard-cache.invalid/'+date+'/WN'+Number(number));
+    const cacheKey = new Request('https://flight-dashboard-cache.invalid/v2/'+date+'/WN'+Number(number));
     const cached = await caches.default.match(cacheKey);
     if (cached) return respond(await cached.json(),200,{'X-Flight-Cache':'HIT'});
     try {

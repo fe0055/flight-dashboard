@@ -1,0 +1,4 @@
+name = "flight-dashboard-api"
+main = "worker/flight-proxy.js"
+compatibility_date = "2026-10-01"
+workers_dev = true

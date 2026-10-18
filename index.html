@@ -130,7 +130,7 @@ function show(){const today=day(), statusUrl='https://www.southwest.com/air/flig
       return '';
     }
     const v=String(candidate).trim();
-    if(!v||/^(null|undefined|n\\/?a|unknown|not assigned|not available|tbd|none|—|-)$/i.test(v))return '';
+    if(!v||/^(null|undefined|n.?a|unknown|not assigned|not available|tbd|none|—|-)$/i.test(v))return '';
     if(!/^[A-Z0-9][A-Z0-9 -]{0,15}$/i.test(v))return '';
     return v.toUpperCase();
   };

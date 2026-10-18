@@ -113,23 +113,47 @@ function show(){const today=day(), statusUrl='https://www.southwest.com/air/flig
   record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||'';
   record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock((arr.scheduledTime||arr.scheduled)?.local)||'';
   record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||'';
-  // Gate fields can be strings, nested objects, or terminal + gate pairs.
-  // Never replace a previously verified/manual gate with a missing API value.
-  const gateValue=(side)=>{
-    const candidates=[side.gate,side.gateNumber,side.gateName,side.boardingGate,side.gateInfo,side.terminalGate,side.airport?.gate];
-    for(const candidate of candidates){
-      if(candidate==null)continue;
-      const value=typeof candidate==='object'?(candidate.name||candidate.number||candidate.code||candidate.gate||candidate.value):candidate;
-      if(value==null)continue;
-      const gate=String(value).trim();
-      if(gate&&!/^(null|undefined|n\/a|unknown|not assigned|—|-)$/i.test(gate)){
-        const terminal=String(side.terminal||side.terminalName||'').trim();
-        return terminal&&/^[0-9]+$/.test(gate)?terminal+gate:gate;
-      }
+  // Read gate assignments across common AeroDataBox response variants.
+  // A terminal by itself is not a gate; never invent an assignment.
+  const normalizeGate=(candidate,depth=0)=>{
+    if(candidate==null||depth>4)return '';
+    if(Array.isArray(candidate)){
+      for(const item of candidate){const v=normalizeGate(item,depth+1);if(v)return v;}
+      return '';
     }
-    return '';
+    if(typeof candidate==='object'){
+      for(const key of ['gate','gateNumber','gateName','boardingGate','number','name','code','value','id']){
+        if(Object.prototype.hasOwnProperty.call(candidate,key)){
+          const v=normalizeGate(candidate[key],depth+1);if(v)return v;
+        }
+      }
+      return '';
+    }
+    const v=String(candidate).trim();
+    if(!v||/^(null|undefined|n\\/?a|unknown|not assigned|not available|tbd|none|—|-)$/i.test(v))return '';
+    if(!/^[A-Z0-9][A-Z0-9 -]{0,15}$/i.test(v))return '';
+    return v.toUpperCase();
+  };
+  const gateValue=side=>{
+    const fields=[side.gate,side.gateNumber,side.gateName,side.boardingGate,
+      side.gateInfo,side.terminalGate,side.airport?.gate,
+      side.airport?.gateNumber,side.airport?.gateInfo,side.airport?.boardingGate,
+      side.gateAssignment,side.actualGate,side.estimatedGate,side.scheduledGate];
+    let gate='';
+    for(const candidate of fields){gate=normalizeGate(candidate);if(gate)break;}
+    if(!gate)return '';
+    const terminal=normalizeGate(side.terminal?.name||side.terminal?.code||side.terminal);
+    // Prefix a single-letter terminal only when the provider supplied a numeric gate.
+    return /^[0-9]+$/.test(gate)&&/^[A-Z]$/.test(terminal)?terminal+gate:gate;
   };
   const departureGate=gateValue(dep),arrivalGate=gateValue(arr);
+  const segmentKey=record.dep+'-'+record.arr;
+  // Never carry gates across different legs sharing a flight number.
+  if(record._gateSegment&&record._gateSegment!==segmentKey){
+    record.depGate='';record.arrGate='';
+  }
+  record._gateSegment=segmentKey;
+  // Keep manual entries only for the same leg; API assignments override cached values.
   if(departureGate)record.depGate=departureGate;
   if(arrivalGate)record.arrGate=arrivalGate;
   record.depRwy=dep.runway||record.depRwy||'';record.arrRwy=arr.runway||record.arrRwy||'';
@@ -144,7 +168,7 @@ function show(){const today=day(), statusUrl='https://www.southwest.com/air/flig
   else if(schedDep&&schedArr&&schedArr>schedDep){next={takeoff:null,landing:null,total:Math.max(1,minutes(schedArr-schedDep)-25),kind:'ROUGH ESTIMATE · SCHEDULE MINUS 25M'}}
   airborne=next;updateDuration();
   put('flight_'+date+'_WN'+number,record);show();
-  status.textContent='AeroDataBox · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||data.retrievedAt||'time unknown')+'. Verify operational details with Southwest.'; el('gateDiagnostic').textContent='Gate feed: '+record.dep+' '+(departureGate||'not provided')+' → '+record.arr+' '+(arrivalGate||'not provided')+' · '+flights.length+' segment(s) returned';
+  status.textContent='AeroDataBox · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||data.retrievedAt||'time unknown')+'. Verify operational details with Southwest.'; el('gateDiagnostic').textContent='Gate feed: '+record.dep+' '+(departureGate||'not supplied by provider')+' → '+record.arr+' '+(arrivalGate||'not supplied by provider')+' · '+flights.length+' segment(s) · '+(departureGate||arrivalGate?'API gate data received':'No gate assignment in flight response');
  }catch(e){status.textContent='Automatic lookup unavailable: '+e.message+'. Manual details still work.';el('gateDiagnostic').textContent='Gate feed error: '+e.message;}
 }
 

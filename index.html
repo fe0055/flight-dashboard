@@ -113,7 +113,25 @@ function show(){const today=day(), statusUrl='https://www.southwest.com/air/flig
   record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||'';
   record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock((arr.scheduledTime||arr.scheduled)?.local)||'';
   record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||'';
-  record.depGate=dep.gate||'';record.arrGate=arr.gate||'';
+  // Gate fields can be strings, nested objects, or terminal + gate pairs.
+  // Never replace a previously verified/manual gate with a missing API value.
+  const gateValue=(side)=>{
+    const candidates=[side.gate,side.gateNumber,side.gateName,side.boardingGate,side.gateInfo,side.terminalGate,side.airport?.gate];
+    for(const candidate of candidates){
+      if(candidate==null)continue;
+      const value=typeof candidate==='object'?(candidate.name||candidate.number||candidate.code||candidate.gate||candidate.value):candidate;
+      if(value==null)continue;
+      const gate=String(value).trim();
+      if(gate&&!/^(null|undefined|n\/a|unknown|not assigned|—|-)$/i.test(gate)){
+        const terminal=String(side.terminal||side.terminalName||'').trim();
+        return terminal&&/^[0-9]+$/.test(gate)?terminal+gate:gate;
+      }
+    }
+    return '';
+  };
+  const departureGate=gateValue(dep),arrivalGate=gateValue(arr);
+  if(departureGate)record.depGate=departureGate;
+  if(arrivalGate)record.arrGate=arrivalGate;
   record.depRwy=dep.runway||record.depRwy||'';record.arrRwy=arr.runway||record.arrRwy||'';
   // Runway timestamps are required for actual airborne duration; gate timestamps are NOT airborne time.
   const takeoff=validUtc(dep.runwayTime?.utc||dep.actualRunwayTime?.utc||dep.takeoffTime?.utc);

@@ -27,6 +27,35 @@ function trimAirport(a) {
     terminal: a?.terminal || null
   };
 }
+function gateOf(m) {
+  const g=m?.gate;
+  return typeof g==='string'&&g.trim()?g.trim():null;
+}
+function flightNumberMatches(f,number) {
+  const candidates=[f.number,f.flightNumber,f.flight?.number,f.airline?.iata&&f.number?f.airline.iata+f.number:null];
+  return candidates.some(x=>x!=null&&String(x).replace(/[^a-z0-9]/gi,'').toUpperCase()==='WN'+Number(number));
+}
+async function boardGate(env, airport, date, number, direction, opposite) {
+  if(!/^[A-Z]{3}$/.test(airport))return null;
+  const from=date+'T00:00',to=date+'T12:00',from2=date+'T12:00',to2=date+'T23:59';
+  for(const [start,end] of [[from,to],[from2,to2]]) {
+    const u=API_BASE+'/flights/airports/iata/'+airport+'/'+start+'/'+end+'?direction='+direction+'&withLeg=true';
+    const response=await fetch(u,{headers:{'X-RapidAPI-Key':env.AERODATABOX_API_KEY,'X-RapidAPI-Host':API_HOST}});
+    if(!response.ok)continue;
+    const data=await response.json();
+    const rows=direction==='Departure'?data.departures:data.arrivals;
+    if(!Array.isArray(rows))continue;
+    for(const f of rows) {
+      if(!flightNumberMatches(f,number))continue;
+      const other=direction==='Departure'?f.arrival?.airport?.iata:f.departure?.airport?.iata;
+      if(other&&other!==opposite)continue;
+      const movement=direction==='Departure'?(f.departure||f.movement):(f.arrival||f.movement);
+      const gate=gateOf(movement);
+      if(gate)return gate;
+    }
+  }
+  return null;
+}
 export default {
   async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin');
@@ -70,6 +99,18 @@ export default {
         departure:trimAirport(f.departure),
         arrival:trimAirport(f.arrival)
       })).filter(f=>/^[A-Z]{3}$/.test(f.departure.iata||'') && /^[A-Z]{3}$/.test(f.arrival.iata||''));
+      // Airport FIDS fallback: only query when a gate is missing. Never guess.
+      // Each segment is matched by flight number and opposite airport.
+      for(const f of flights) {
+        if(!f.departure.gate) {
+          try { f.departure.gate=await boardGate(env,f.departure.iata,date,number,'Departure',f.arrival.iata); }
+          catch(e) { /* preserve primary flight data */ }
+        }
+        if(!f.arrival.gate) {
+          try { f.arrival.gate=await boardGate(env,f.arrival.iata,date,number,'Arrival',f.departure.iata); }
+          catch(e) { /* preserve primary flight data */ }
+        }
+      }
       const result = {source:'AeroDataBox',retrievedAt:new Date().toISOString(),flights};
       // Never cache upstream errors. Cache a validated success only.
       ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{

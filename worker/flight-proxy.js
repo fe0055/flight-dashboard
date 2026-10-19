@@ -112,29 +112,32 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/atis') {
       const icao=(url.searchParams.get('icao')||'').toUpperCase();
-      if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'Invalid US airport ICAO'},400);
-      if(!env.ATIS_RELAY_API_KEY)return respond({error:'ATIS Relay API key not configured',configured:false},503);
-      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-v1/'+icao);
+      if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'US ICAO airport required'},400);
+      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-free/v1/'+icao);
       const cached=await caches.default.match(cacheKey);
-      if(cached)return respond(await cached.json(),200,{'X-ATIS-Cache':'HIT'});
+      if(cached)return respond(await cached.json());
       try{
-        const upstream=await fetch('https://atisrelay.com/api/atis?icao='+icao,{headers:{'X-Api-Key':env.ATIS_RELAY_API_KEY}});
-        if(!upstream.ok)return respond({error:'ATIS Relay unavailable',providerStatus:upstream.status},502);
+        const upstream=await fetch('https://datis.clowd.io/api/'+icao,{headers:{Accept:'application/json'}});
+        if(!upstream.ok)return respond({icao,available:false,reason:'D-ATIS source unavailable',source:'datis.clowd.io'},200);
         const data=await upstream.json();
-        const report=data.arrival||data.atis||data.departure||null;
-        const raw=String(report?.dataBody||report?.text||report?.raw||'').toUpperCase();
-        const found=[];
-        const addRunway=x=>{const m=String(x).match(/^(0?[1-9]|[12][0-9]|3[0-6])([LRC]?)$/);if(!m)return;const r=m[1].padStart(2,'0')+m[2];if(!found.includes(r))found.push(r)};
-        // Accept explicit landing-runway lists only; never infer runway assignments from approaches or wind.
-        const patterns=[
-          /(?:LANDING|ARRIVALS?)(?:\s+RUNWAYS?)?\s+(?:ON|RUNWAYS?|RWYS?|RWY|ARE|IS|IN USE|TO|AND|,|\/|\s)*\s*((?:\d{1,2}[LRC]?\s*(?:,|\/|AND|&)\s*)*\d{1,2}[LRC]?)/g,
-          /RUNWAYS?\s+IN\s+USE\s+FOR\s+LANDING\s*((?:\d{1,2}[LRC]?\s*(?:,|\/|AND|&)\s*)*\d{1,2}[LRC]?)/g
-        ];
-        for(const re of patterns){let m;while((m=re.exec(raw))!==null){for(const part of m[1].match(/\b\d{1,2}[LRC]?\b/g)||[])addRunway(part)}}
-        const result={icao,runways:found,letter:report?.letter||report?.atisCode||null,reportedAt:new Date().toISOString(),source:'ATIS Relay',available:!!raw,disclaimer:'NOT FOR OPERATIONAL USE'};
-        ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=300'}})));
+        const reports=Array.isArray(data)?data:[data];
+        const arrivals=reports.filter(x=>x&&/^(arrival|combined)$/i.test(String(x.type||'')));
+        const runways=[];
+        const add=v=>{const m=String(v).toUpperCase().match(/^(0?[1-9]|[12][0-9]|3[0-6])([LRC]?)$/);if(m){const n=m[1].padStart(2,'0')+m[2];if(!runways.includes(n))runways.push(n)}};
+        for(const report of arrivals){
+          const raw=String(report.datis||'').toUpperCase();
+          // Restrict extraction to explicit landing runway clauses, not general approach/runway mentions.
+          const clauses=raw.match(/(?:LANDING|ARRIVALS?)(?:\\s+(?:RUNWAYS?|RWYS?))?\\s+(?:ON|USING|IN USE|RUNWAYS?|RWYS?|RWY|ARE|IS|AND|,|\\/|\\s)*\\s*((?:\\d{1,2}[LRC]?\\s*(?:,|\\/|AND|&|\\s)\\s*)*\\d{1,2}[LRC]?)/g)||[];
+          for(const clause of clauses){
+            const after=clause.replace(/^.*?(?:LANDING|ARRIVALS?)/,'');
+            for(const m of after.matchAll(/\\b(\\d{1,2}[LRC]?)\\b/g))add(m[1]);
+          }
+        }
+        const letter=arrivals.find(x=>x.code)?.code||null;
+        const result={icao,runways,letter,available:runways.length>0,source:'datis.clowd.io',retrievedAt:new Date().toISOString(),disclaimer:'NOT FOR OPERATIONAL USE'};
+        ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
         return respond(result);
-      }catch{return respond({error:'ATIS Relay request failed'},502)}
+      }catch{return respond({icao,available:false,runways:[],source:'datis.clowd.io',reason:'D-ATIS fetch failed'},200)}
     }
     if (url.pathname !== '/flight') return respond({error:'Not found'},404);
     const number = (url.searchParams.get('number') || '').replace(/^WN/i,'');

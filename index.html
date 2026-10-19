@@ -190,13 +190,35 @@ function chooseFlightLeg(flights){
   dialog.hidden=false;options.querySelector('button')?.focus();
  });
 }
-async function loadCachedFlight(){
+let flightLookupBusy=false;
+async function loadCachedFlight(force=false){
  const status=el('importStatus'),number=current,date=day();
- status.textContent='Looking up WN'+number+' for '+date+'…';
+ const key='api_flights_'+date+'_WN'+number,limitKey='flight_api_cooldown';
+ if(flightLookupBusy){status.textContent='Flight lookup already running';return;}
+ const saved=get(key),now=Date.now();
+ const cached=Array.isArray(saved.flights)&&saved.flights.length&&now-saved.time<30*60*1000;
+ const cooldown=get(limitKey);
+ const blocked=Number(cooldown.until)>now;
+ if(blocked&&!cached){status.textContent='AeroDataBox rate limit · Retry after '+new Date(cooldown.until).toLocaleTimeString()+' · Saved flight details remain available';return;}
+ flightLookupBusy=true;
+ status.textContent=cached?'Using recently saved flight data…':'Looking up WN'+number+' for '+date+'…';
  try{
-  const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/flight?number='+encodeURIComponent(number)+'&date='+encodeURIComponent(date),{cache:'no-store'});
-  const data=await response.json();
-  if(!response.ok)throw Error(data.error||'Flight lookup failed ('+response.status+')');
+  let data;
+  if(cached&&(!force||blocked)){data=saved.flights;}
+  else{
+   const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/flight?number='+encodeURIComponent(number)+'&date='+encodeURIComponent(date),{cache:'no-store'});
+   data=await response.json();
+   if(!response.ok){
+    if(response.status===429||data.providerStatus===429){
+     put(limitKey,{until:Date.now()+60*60*1000});
+     if(Array.isArray(saved.flights)&&saved.flights.length){data=saved.flights;status.textContent='Rate limited · Showing saved flight data';}
+     else throw Error('AeroDataBox quota reached · Please try again later');
+    }else throw Error(data.error||'Flight lookup failed ('+response.status+')');
+   }else{
+    const list=Array.isArray(data)?data:(Array.isArray(data.flights)?data.flights:[]);
+    if(list.length)put(key,{time:Date.now(),flights:list});
+   }
+  }
   if(current!==number||day()!==date)return;
   const flights=(Array.isArray(data)?data:(Array.isArray(data.flights)?data.flights:[])).filter(f=>String(f.number||'').replace(/\s/g,'').toUpperCase()==='WN'+String(Number(number)));
   if(!flights.length)throw Error('No matching Southwest flight found today');
@@ -307,7 +329,7 @@ async function loadCachedFlight(){
   airborne=next;updateDuration();
   put('flight_'+date+'_WN'+number,record);show();
   status.textContent='AeroDataBox · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||data.retrievedAt||'time unknown')+'. Verify operational details with Southwest.'; el('gateDiagnostic').textContent='Gate feed: '+record.dep+' '+(departureGate||'not supplied by provider')+' → '+record.arr+' '+(arrivalGate||'not supplied by provider')+' · '+flights.length+' segment(s) · '+(departureGate||arrivalGate?'API gate data received':'No gate assignment in flight response');
- }catch(e){status.textContent='Automatic lookup unavailable: '+e.message+'. Enter airport codes under Edit details to check runway configuration.';el('gateDiagnostic').textContent='Gate feed error: '+e.message;el('runwayDiagnostic').textContent='Flight runway feed unavailable · Airport runway configuration can be checked separately';el('gateFallback').style.display='flex';if(record.arr)loadArrivalAtis(record.arr).catch(()=>{});}
+ }catch(e){status.textContent='Automatic lookup unavailable: '+e.message+'. Enter airport codes under Edit details to check runway configuration.';el('gateDiagnostic').textContent='Gate feed error: '+e.message;el('runwayDiagnostic').textContent='Flight runway feed unavailable · Airport runway configuration can be checked separately';el('gateFallback').style.display='flex';if(record.arr)loadArrivalAtis(record.arr).catch(()=>{});}finally{flightLookupBusy=false;}
 }
 
 // Local, per-flight handwritten notes. No flight lookup or weather logic changed.
@@ -323,6 +345,6 @@ function noteEnd(){if(!noteDrawing)return;noteDrawing=false;noteCtx.globalCompos
 noteCanvas.addEventListener('pointerdown',noteStart);noteCanvas.addEventListener('pointermove',noteMove);noteCanvas.addEventListener('pointerup',noteEnd);noteCanvas.addEventListener('pointercancel',noteEnd);
 el('penTool').onclick=()=>{noteMode='pen';el('penTool').classList.add('active');el('eraserTool').classList.remove('active')};el('eraserTool').onclick=()=>{noteMode='eraser';el('eraserTool').classList.add('active');el('penTool').classList.remove('active')};el('clearNotes').onclick=()=>{if(confirm('Clear handwritten notes for this flight?')){noteCtx.clearRect(0,0,noteCanvas.width,noteCanvas.height);saveNotes()}};
 window.addEventListener('resize',()=>{if(el('dashboard').style.display==='block'){clearTimeout(noteSaveTimer);noteSaveTimer=setTimeout(resizeNotes,150)}});
-el('autoImport').addEventListener('click',loadCachedFlight);
+el('autoImport').addEventListener('click',()=>loadCachedFlight(true));
 el('back').addEventListener('click',function(){el('dashboard').style.display='none';el('home').style.display='flex'});el('editButton').addEventListener('click',function(){el('editor').open=true;el('editor').scrollIntoView({behavior:'smooth',block:'start'})});el('save').addEventListener('click',function(){for(let k of Object.keys(keys))record[k]=el('f_'+k).value.trim().toUpperCase();record.depRwy=validAirportRunway(record.dep,record.depRwy);record.arrRwy=validAirportRunway(record.arr,record.arrRwy);put('flight_'+day()+'_WN'+current,record);show();loadArrivalAtis(record.arr).catch(()=>{});el('editor').open=false;window.scrollTo({top:0,behavior:'smooth'})});})();
 </script></body></html>

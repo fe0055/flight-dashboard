@@ -206,7 +206,22 @@ async function loadCachedFlight(){
   // Keep manual entries only for the same leg; API assignments override cached values.
   if(departureGate)record.depGate=departureGate;
   if(arrivalGate)record.arrGate=arrivalGate;
-  record.depRwy=dep.runway||record.depRwy||'';record.arrRwy=arr.runway||record.arrRwy||'';
+  // Extract a runway designator only from flight-specific fields, not ATIS airport configuration.
+  const runwayValue=side=>{
+    const values=[side.runway,side.actualRunway,side.runwayName,side.runwayNumber,side.takeoffRunway,side.landingRunway,side.runwayInfo];
+    for(const item of values){
+      const raw=item&&typeof item==='object'?(item.name||item.number||item.designator||item.ident):item;
+      if(raw==null)continue;
+      const m=String(raw).trim().toUpperCase().match(/^(?:RWY|RUNWAY)?\s*(0?[1-9]|[12][0-9]|3[0-6])([LRC])?$/);
+      if(m)return String(Number(m[1])).padStart(2,'0')+(m[2]||'');
+    }
+    return '';
+  };
+  if(record._runwaySegment&&record._runwaySegment!==segmentKey){record.depRwy='';record.arrRwy='';}
+  record._runwaySegment=segmentKey;
+  const departureRunway=runwayValue(dep),arrivalRunway=runwayValue(arr);
+  if(departureRunway)record.depRwy=departureRunway;
+  if(arrivalRunway)record.arrRwy=arrivalRunway;
   loadArrivalAtis(record.arr).catch(()=>{});
   // Use actual runway timestamps for airborne time; never use gate times as takeoff.
   const timeOf=v=>validUtc(typeof v==='string'?v:(v?.utc||v?.local||null));

@@ -156,7 +156,14 @@ async function loadCachedFlight(){
   }
   const dep=f.departure||{},arr=f.arrival||{};
   if(!/^[A-Z]{3}$/.test((dep.airport?.iata||dep.iata||''))||!/^[A-Z]{3}$/.test((arr.airport?.iata||arr.iata||'')))throw Error('Airport information unavailable');
-  record.dep=dep.airport?.iata||dep.iata;record.arr=arr.airport?.iata||arr.iata;
+  const selectedDep=dep.airport?.iata||dep.iata,selectedArr=arr.airport?.iata||arr.iata;
+  const selectedSegment=selectedDep+'-'+selectedArr+'-'+String((dep.scheduledTime||dep.scheduled)?.utc||'').slice(0,16);
+  if(record._selectedSegment!==selectedSegment){
+    record.depGate='';record.arrGate='';record.depRwy='';record.arrRwy='';
+    record._gateSegment='';record._runwaySegment='';
+  }
+  record._selectedSegment=selectedSegment;
+  record.dep=selectedDep;record.arr=selectedArr;
   const clock=x=>{const m=String(x||'').match(/(?:T|\s)(\d{2}:\d{2})/);return m?m[1]:''};
   const zulu=x=>{const t=clock(x);return t?t+'Z':''};const dayOffset=(local,utc)=>{if(!local||!utc)return '';const a=new Date(local),b=new Date(utc);if(!Number.isFinite(a.getTime())||!Number.isFinite(b.getTime()))return '';const localDay=String(local).slice(0,10),utcDay=String(utc).slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(localDay)||!/^\d{4}-\d{2}-\d{2}$/.test(utcDay))return '';const diff=Math.round((Date.parse(utcDay+'T00:00:00Z')-Date.parse(localDay+'T00:00:00Z'))/86400000);return diff>0?' (Z +'+diff+'d)':diff<0?' (Z '+diff+'d)':''};
   record.etd=clock(dep.revisedTime?.local)||clock((dep.scheduledTime||dep.scheduled)?.local)||'';

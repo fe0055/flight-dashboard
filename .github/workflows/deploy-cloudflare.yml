@@ -25,9 +25,14 @@ jobs:
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FLIGHT_KEY: ${{ secrets.AERODATABOX_API_KEY }}
         run: |
           if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
             echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions secrets."
+            exit 1
+          fi
+          if [ -z "$FLIGHT_KEY" ]; then
+            echo "::error::Add AERODATABOX_API_KEY as a GitHub Actions repository secret before deploying. This protects the live flight feed."
             exit 1
           fi
       - name: Deploy Worker
@@ -37,3 +42,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '3.114.17'
           command: deploy --config wrangler.toml
+          secrets: |
+            AERODATABOX_API_KEY
+        env:
+          AERODATABOX_API_KEY: ${{ secrets.AERODATABOX_API_KEY }}

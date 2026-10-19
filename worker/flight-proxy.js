@@ -28,16 +28,25 @@ function trimAirport(a) {
     terminal: a?.terminal || null
   };
 }
-function gateOf(m) {
-  const g=m?.gate ?? m?.gateNumber ?? m?.boardingGate ?? m?.gateInfo;
-  if(typeof g==='string'&&g.trim())return g.trim();
-  if(typeof g==='number')return String(g);
-  if(g&&typeof g==='object')return gateOf(g);
+function gateOf(m, depth=0) {
+  if(depth>3 || m==null)return null;
+  if(typeof m==='string')return /^[A-Z0-9][A-Z0-9 -]{0,15}$/i.test(m.trim())?m.trim().toUpperCase():null;
+  if(typeof m==='number')return String(m);
+  if(typeof m!=='object')return null;
+  for(const key of ['gate','gateNumber','gateName','boardingGate','gateInfo','gateAssignment','terminalGate','actualGate','estimatedGate','scheduledGate']){
+    const value=gateOf(m[key],depth+1);
+    if(value)return value;
+  }
   return null;
 }
 function flightNumberMatches(f,number) {
-  const candidates=[f.number,f.flightNumber,f.flight?.number,f.airline?.iata&&f.number?f.airline.iata+f.number:null];
-  return candidates.some(x=>x!=null&&String(x).replace(/[^a-z0-9]/gi,'').toUpperCase()==='WN'+Number(number));
+  const wanted=String(Number(number));
+  const candidates=[f.number,f.flightNumber,f.flight?.number,f.flight?.flightNumber,f.airline?.iata&&f.number?f.airline.iata+f.number:null];
+  return candidates.some(x=>{
+    if(x==null)return false;
+    const v=String(x).replace(/[^a-z0-9]/gi,'').toUpperCase();
+    return v===wanted || v==='WN'+wanted || v==='SWA'+wanted;
+  });
 }
 async function boardGate(env, airport, date, number, direction, opposite) {
   if(!/^[A-Z]{3}$/.test(airport))return null;
@@ -54,7 +63,7 @@ async function boardGate(env, airport, date, number, direction, opposite) {
       const other=direction==='Departure'?f.arrival?.airport?.iata:f.departure?.airport?.iata;
       if(other&&other!==opposite)continue;
       const movement=direction==='Departure'?(f.departure||f.movement):(f.arrival||f.movement);
-      const gate=gateOf(movement);
+      const gate=gateOf(movement) || gateOf(movement?.airport);
       if(gate)return gate;
     }
   }
@@ -86,7 +95,7 @@ export default {
       return respond({error:'Invalid flight number or date'},400);
     if (!env.AERODATABOX_API_KEY) return respond({error:'API secret not configured'},503);
     // Cache repeated lookups for 15 minutes to conserve API quota.
-    const cacheKey = new Request('https://flight-dashboard-cache.invalid/v2/'+date+'/WN'+Number(number));
+    const cacheKey = new Request('https://flight-dashboard-cache.invalid/v3/'+date+'/WN'+Number(number));
     const cached = await caches.default.match(cacheKey);
     if (cached) return respond(await cached.json(),200,{'X-Flight-Cache':'HIT'});
     try {

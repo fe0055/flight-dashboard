@@ -20,12 +20,26 @@ function respond(body, status = 200, extra = {}) {
     }
   });
 }
+function runwayOf(a) {
+  // AeroDataBox can return runway as a string or a structured runway object.
+  const candidates=[a?.runway,a?.runwayNumber,a?.runwayName,a?.actualRunway,a?.landingRunway,a?.departureRunway,a?.runwayInfo];
+  for(const candidate of candidates){
+    const value=typeof candidate==='object'&&candidate!==null
+      ?(candidate.name||candidate.number||candidate.designator||candidate.ident||candidate.id)
+      :candidate;
+    if(typeof value!=='string'&&typeof value!=='number')continue;
+    const normalized=String(value).trim().toUpperCase().replace(/^RWY\s*/,'').replace(/^RUNWAY\s*/,'');
+    if(/^(0?[1-9]|[12][0-9]|3[0-6])[LRC]?$/.test(normalized))
+      return normalized.replace(/^(\d)(?=[LRC]?$)/,'0$1');
+  }
+  return null;
+}
 function trimAirport(a) {
   return {
     iata: typeof a?.airport?.iata === 'string' ? a.airport.iata.toUpperCase() : null,
     scheduled: a?.scheduledTime || null,
     predicted: a?.predictedTime || null,
-    runway: typeof a?.runway === 'string' ? a.runway : null,
+    runway: runwayOf(a),
     runwayTime: a?.runwayTime || null,
     actualRunwayTime: a?.actualRunwayTime || null,
     predictedRunwayTime: a?.predictedRunwayTime || null,

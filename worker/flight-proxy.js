@@ -106,13 +106,17 @@ export default {
         const upstream=await fetch('https://atisrelay.com/api/atis?icao='+icao,{headers:{'X-Api-Key':env.ATIS_RELAY_API_KEY}});
         if(!upstream.ok)return respond({error:'ATIS Relay unavailable',providerStatus:upstream.status},502);
         const data=await upstream.json();
-        const bodies=[data.arrival?.dataBody,data.arrival?.text,data.arrival?.raw,data.atis?.dataBody,data.atis?.text,data.atis?.raw].filter(x=>typeof x==='string'&&x.trim());
-        const raw=bodies.join(' ').toUpperCase();
+        const report=data.arrival||data.atis||data.departure||null;
+        const raw=String(report?.dataBody||report?.text||report?.raw||'').toUpperCase();
         const found=[];
-        // Only use explicitly published landing/arrival runway statements, not wind-based inference.
-        const patterns=[/(?:LANDING|ARRIVALS?|LANDING RUNWAYS?|RUNWAYS? IN USE FOR LANDING)\s+(?:ON|RUNWAYS?|RWYS?|RWY|ARE|IS|IN USE|TO)?\s*([0-9]{1,2}[LRC]?(?:\s*(?:,|\/|AND|&|OR)\s*(?:RUNWAY\s*)?[0-9]{1,2}[LRC]?)*)/g,/(?:ILS|RNAV|VISUAL)\s+(?:APPROACH(?:ES)?\s+(?:TO|RUNWAYS?|RWYS?)\s*)?(?:RUNWAY|RWY)\s*([0-9]{1,2}[LRC]?)/g];
-        for(const re of patterns){let m;while((m=re.exec(raw))!==null){for(const part of m[1].match(/\b(?:0?[1-9]|[12][0-9]|3[0-6])[LRC]?\b/g)||[]){const r=part.padStart(part.length===1?2:part.length,'0');if(!found.includes(r))found.push(r);}}}
-        const result={icao,runways:found,letter:data.arrival?.letter||data.arrival?.atisCode||data.atis?.letter||data.atis?.atisCode||null,reportedAt:new Date().toISOString(),source:'ATIS Relay',available:!!raw};
+        const addRunway=x=>{const m=String(x).match(/^(0?[1-9]|[12][0-9]|3[0-6])([LRC]?)$/);if(!m)return;const r=m[1].padStart(2,'0')+m[2];if(!found.includes(r))found.push(r)};
+        // Accept explicit landing-runway lists only; never infer runway assignments from approaches or wind.
+        const patterns=[
+          /(?:LANDING|ARRIVALS?)(?:\\s+RUNWAYS?)?\\s+(?:ON|RUNWAYS?|RWYS?|RWY|ARE|IS|IN USE|TO|AND|,|\\/|\\s)*\\s*((?:\\d{1,2}[LRC]?\\s*(?:,|\\/|AND|&)\\s*)*\\d{1,2}[LRC]?)/g,
+          /RUNWAYS?\\s+IN\\s+USE\\s+FOR\\s+LANDING\\s*((?:\\d{1,2}[LRC]?\\s*(?:,|\\/|AND|&)\\s*)*\\d{1,2}[LRC]?)/g
+        ];
+        for(const re of patterns){let m;while((m=re.exec(raw))!==null){for(const part of m[1].match(/\\b\\d{1,2}[LRC]?\\b/g)||[])addRunway(part)}}
+        const result={icao,runways:found,letter:report?.letter||report?.atisCode||null,reportedAt:new Date().toISOString(),source:'ATIS Relay',available:!!raw,disclaimer:'NOT FOR OPERATIONAL USE'};
         ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=300'}})));
         return respond(result);
       }catch{return respond({error:'ATIS Relay request failed'},502)}

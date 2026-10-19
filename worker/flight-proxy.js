@@ -25,6 +25,12 @@ function trimAirport(a) {
     iata: typeof a?.airport?.iata === 'string' ? a.airport.iata.toUpperCase() : null,
     scheduled: a?.scheduledTime || null,
     predicted: a?.predictedTime || null,
+    runwayTime: a?.runwayTime || null,
+    actualRunwayTime: a?.actualRunwayTime || null,
+    predictedRunwayTime: a?.predictedRunwayTime || null,
+    estimatedRunwayTime: a?.estimatedRunwayTime || null,
+    takeoffTime: a?.takeoffTime || null,
+    landingTime: a?.landingTime || null,
     gate: gateOf(a) || gateOf(a?.airport) || null,
     terminal: a?.terminal || null
   };

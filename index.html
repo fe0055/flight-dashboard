@@ -124,20 +124,53 @@ window.addEventListener('focus',()=>{
   loadCachedFlight().catch(err=>{el('gateDiagnostic').textContent='Gate refresh error: '+err.message;});
  }
 });
+// Airport-wide runway configuration only. Never substitute for assigned landing runway.
 async function loadArrivalAtis(iata){
  const panel=el('atisRunways');
  if(!/^[A-Z]{3}$/.test(iata||'')){panel.style.display='none';return;}
- panel.style.display='block';panel.textContent='Arrival runways in use · Checking D-ATIS…';
+ panel.style.display='block';
+ panel.textContent='Arrival runways in use · Checking live sources…';
+ const icao='K'+iata;
+ const stillCurrent=()=>current&&record&&record.arr===iata;
+ const fresh=timestamp=>{const t=Date.parse(timestamp||'');const age=Date.now()-t;return Number.isFinite(age)&&age>=-120000&&age<=20*60000;};
+ const clean=values=>(Array.isArray(values)?values:[]).map(v=>String(v).trim().toUpperCase()).filter(v=>/^(?:0?[1-9]|[12][0-9]|3[0-6])[LCR]?$/.test(v)).filter(v=>!!validAirportRunway(iata,v));
+ const display=(runways,source,time)=>{
+  if(!stillCurrent())return;
+  panel.replaceChildren();
+  const heading=document.createElement('strong');heading.textContent='Arrival runways in use · '+runways.join(' / ');panel.appendChild(heading);
+  const note=document.createElement('small');note.textContent=source+' · '+new Date(time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+'Z · Airport-wide configuration, not assigned landing runway · Verify with ATIS/ATC';panel.appendChild(note);
+ };
+ // FAA NAS Status is authoritative where it actually publishes a recent airport configuration.
  try{
-  const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/atis?icao=K'+encodeURIComponent(iata),{cache:'no-store'});
-  const data=await response.json();
-  if(!current||!record||record.arr!==iata)return;
-  if(!response.ok||!data.available||!Array.isArray(data.runways)||!data.runways.length){
-   panel.textContent='Arrival runways in use · D-ATIS unavailable';return;
+  const response=await fetch('https://nasstatus.faa.gov/api/airport-events',{cache:'no-store'});
+  if(response.ok){
+   const entries=await response.json();
+   const airport=Array.isArray(entries)?entries.find(x=>x.airportId===iata):null;
+   const config=airport?.airportConfig;
+   const runways=clean(String(config?.arrivalRunwayConfig||'').match(/\b(?:0?[1-9]|[12][0-9]|3[0-6])[LCR]?\b/g)||[]);
+   if(runways.length&&fresh(config?.sourceTimeStamp)){display(runways,'FAA NAS Status',config.sourceTimeStamp);return;}
   }
-  panel.textContent='Arrival runways in use · '+data.runways.join(' / ')+(data.letter?' · ATIS '+data.letter:'');
-  const note=document.createElement('small');note.textContent='Airport configuration only — not your assigned landing runway. Not for operational use.';panel.appendChild(note);
- }catch{panel.textContent='Arrival runways in use · D-ATIS unavailable';}
+ }catch(e){}
+ // Free third-party D-ATIS parser; reject stale results and invalid runways.
+ try{
+  const response=await fetch('https://runwaysinuse.com/api/v1/runway/'+icao,{cache:'no-store'});
+  if(response.ok){
+   const data=await response.json();
+   const runways=clean(data.arriving_runways);
+   const time=data.timestamp||data.last_updated;
+   if(runways.length&&fresh(time)){display(runways,'Runways in Use (D-ATIS parsed)',time);return;}
+  }
+ }catch(e){}
+ // Existing Worker D-ATIS endpoint remains the final fallback.
+ try{
+  const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/atis?icao='+icao,{cache:'no-store'});
+  const data=await response.json();
+  if(!stillCurrent())return;
+  const runways=clean(data.runways);
+  const time=data.timestamp||data.updatedAt||data.last_updated;
+  if(response.ok&&data.available&&runways.length&&fresh(time)){display(runways,'D-ATIS',time);return;}
+ }catch(e){}
+ if(stillCurrent())panel.textContent='Arrival runways in use · No verified current configuration available';
 }
 function chooseFlightLeg(flights){
  return new Promise(resolve=>{

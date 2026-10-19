@@ -192,6 +192,18 @@ async function loadCachedFlight(){
   if(departureGate)record.depGate=departureGate;
   if(arrivalGate)record.arrGate=arrivalGate;
   record.depRwy=dep.runway||record.depRwy||'';record.arrRwy=arr.runway||record.arrRwy||'';
+  // D-ATIS reports runways in use, never a confirmed runway assignment for this flight.
+  if(record.arr&&/^[A-Z]{3}$/.test(record.arr)){
+    fetch('https://flight-dashboard-api.fe005.workers.dev/atis?icao=K'+record.arr,{cache:'no-store'})
+      .then(r=>r.ok?r.json():null)
+      .then(atis=>{
+        if(!atis||!Array.isArray(atis.runways)||!atis.runways.length)return;
+        if(record.arr!==arr.airport?.iata&&record.arr!==arr.iata)return;
+        const value=atis.runways.join(' / ')+' (D-ATIS · IN USE)';
+        if(!arr.runway){record.arrRwy=value;el('arrRwy').textContent=value;}
+      }).catch(()=>{});
+  }
+
   // Use actual runway timestamps for airborne time; never use gate times as takeoff.
   const timeOf=v=>validUtc(typeof v==='string'?v:(v?.utc||v?.local||null));
   const takeoff=timeOf(dep.runwayTime)||timeOf(dep.actualRunwayTime)||timeOf(dep.takeoffTime);

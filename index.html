@@ -65,7 +65,7 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
   // converted NWS values when the original report is unavailable.
   const raw=String(p.rawMessage||'').toUpperCase();
   const m=raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
-  if(!m){const speed=p.windSpeed?.value,dir=p.windDirection?.value,gust=p.windGust?.value;if(typeof speed!=='number')return null;const knots=Math.round(speed*1.943844);return {d:typeof dir==='number'?dir:null,speed:knots,gust:typeof gust==='number'?Math.round(gust*1.943844):null,calm:knots===0,variable:dir==null,stamp:p.timestamp,decoded:true};}
+  if(!m)return null; // No raw METAR wind group: do not estimate from decoded NWS fields.
   const speed=Number(m[2]),gust=m[3]?Number(m[3]):null;
   const variable=m[1]==='VRB',d=variable?null:Number(m[1]);
   return {d,speed,gust,calm:speed===0,variable,stamp:p.timestamp};
@@ -94,12 +94,12 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
   }
   if(record.arr!==iata)return;
   const arrow=el('windArrow');
-  if(!w){el('wind').textContent='Not reported';arrow.style.visibility='hidden';}
+  if(!w){el('wind').textContent='Raw METAR wind unavailable';arrow.style.visibility='hidden';}
   else{
    const direction=w.variable?'VRB':typeof w.d==='number'?String(Math.round(w.d)).padStart(3,'0')+'°':'Variable';
    const text=w.calm?'Calm':direction+' · '+w.speed+' kt'+(w.gust!==null&&w.gust>w.speed?' G'+w.gust:'');
    const age=Math.round((Date.now()-Date.parse(w.stamp))/60000);
-   el('wind').textContent=text+(w.decoded?' · NWS decoded':'')+(age>45?' · '+age+'m old':'');
+   el('wind').textContent=text+' · METAR'+(age>45?' · '+age+'m old':'');
    arrow.style.transform=typeof w.d==='number'&&!w.calm&&!w.variable?'rotate('+(w.d%360)+'deg)':'none';
    arrow.style.visibility=typeof w.d==='number'&&!w.calm&&!w.variable?'visible':'hidden';
   }

@@ -199,7 +199,7 @@ async function loadCachedFlight(){
       .then(atis=>{
         if(!atis||!Array.isArray(atis.runways)||!atis.runways.length)return;
         if(record.arr!==arr.airport?.iata&&record.arr!==arr.iata)return;
-        const value=atis.runways.join(' / ')+' (D-ATIS · IN USE)';
+        const value=atis.runways.join(' / ')+' (D-ATIS'+(atis.letter?' '+atis.letter:'')+' · IN USE)';
         if(!arr.runway){record.arrRwy=value;el('arrRwy').textContent=value;}
       }).catch(()=>{});
   }

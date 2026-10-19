@@ -112,10 +112,10 @@ export default {
         const addRunway=x=>{const m=String(x).match(/^(0?[1-9]|[12][0-9]|3[0-6])([LRC]?)$/);if(!m)return;const r=m[1].padStart(2,'0')+m[2];if(!found.includes(r))found.push(r)};
         // Accept explicit landing-runway lists only; never infer runway assignments from approaches or wind.
         const patterns=[
-          /(?:LANDING|ARRIVALS?)(?:\\s+RUNWAYS?)?\\s+(?:ON|RUNWAYS?|RWYS?|RWY|ARE|IS|IN USE|TO|AND|,|\\/|\\s)*\\s*((?:\\d{1,2}[LRC]?\\s*(?:,|\\/|AND|&)\\s*)*\\d{1,2}[LRC]?)/g,
-          /RUNWAYS?\\s+IN\\s+USE\\s+FOR\\s+LANDING\\s*((?:\\d{1,2}[LRC]?\\s*(?:,|\\/|AND|&)\\s*)*\\d{1,2}[LRC]?)/g
+          /(?:LANDING|ARRIVALS?)(?:\s+RUNWAYS?)?\s+(?:ON|RUNWAYS?|RWYS?|RWY|ARE|IS|IN USE|TO|AND|,|\/|\s)*\s*((?:\d{1,2}[LRC]?\s*(?:,|\/|AND|&)\s*)*\d{1,2}[LRC]?)/g,
+          /RUNWAYS?\s+IN\s+USE\s+FOR\s+LANDING\s*((?:\d{1,2}[LRC]?\s*(?:,|\/|AND|&)\s*)*\d{1,2}[LRC]?)/g
         ];
-        for(const re of patterns){let m;while((m=re.exec(raw))!==null){for(const part of m[1].match(/\\b\\d{1,2}[LRC]?\\b/g)||[])addRunway(part)}}
+        for(const re of patterns){let m;while((m=re.exec(raw))!==null){for(const part of m[1].match(/\b\d{1,2}[LRC]?\b/g)||[])addRunway(part)}}
         const result={icao,runways:found,letter:report?.letter||report?.atisCode||null,reportedAt:new Date().toISOString(),source:'ATIS Relay',available:!!raw,disclaimer:'NOT FOR OPERATIONAL USE'};
         ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=300'}})));
         return respond(result);

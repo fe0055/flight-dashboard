@@ -95,6 +95,28 @@ export default {
     if (request.method !== 'GET') return respond({error:'Method not allowed'},405);
     if (origin && origin !== ALLOWED_ORIGIN) return respond({error:'Origin not allowed'},403);
     const url = new URL(request.url);
+    if (url.pathname === '/atis') {
+      const icao=(url.searchParams.get('icao')||'').toUpperCase();
+      if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'Invalid US airport ICAO'},400);
+      if(!env.ATIS_RELAY_API_KEY)return respond({error:'ATIS Relay API key not configured',configured:false},503);
+      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-v1/'+icao);
+      const cached=await caches.default.match(cacheKey);
+      if(cached)return respond(await cached.json(),200,{'X-ATIS-Cache':'HIT'});
+      try{
+        const upstream=await fetch('https://atisrelay.com/api/atis?icao='+icao,{headers:{'X-Api-Key':env.ATIS_RELAY_API_KEY}});
+        if(!upstream.ok)return respond({error:'ATIS Relay unavailable',providerStatus:upstream.status},502);
+        const data=await upstream.json();
+        const bodies=[data.arrival?.dataBody,data.arrival?.text,data.arrival?.raw,data.atis?.dataBody,data.atis?.text,data.atis?.raw].filter(x=>typeof x==='string'&&x.trim());
+        const raw=bodies.join(' ').toUpperCase();
+        const found=[];
+        // Only use explicitly published landing/arrival runway statements, not wind-based inference.
+        const patterns=[/(?:LANDING|ARRIVALS?|LANDING RUNWAYS?|RUNWAYS? IN USE FOR LANDING)\s+(?:ON|RUNWAYS?|RWYS?|RWY|ARE|IS|IN USE|TO)?\s*([0-9]{1,2}[LRC]?(?:\s*(?:,|\/|AND|&|OR)\s*(?:RUNWAY\s*)?[0-9]{1,2}[LRC]?)*)/g,/(?:ILS|RNAV|VISUAL)\s+(?:APPROACH(?:ES)?\s+(?:TO|RUNWAYS?|RWYS?)\s*)?(?:RUNWAY|RWY)\s*([0-9]{1,2}[LRC]?)/g];
+        for(const re of patterns){let m;while((m=re.exec(raw))!==null){for(const part of m[1].match(/\b(?:0?[1-9]|[12][0-9]|3[0-6])[LRC]?\b/g)||[]){const r=part.padStart(part.length===1?2:part.length,'0');if(!found.includes(r))found.push(r);}}}
+        const result={icao,runways:found,letter:data.arrival?.letter||data.arrival?.atisCode||data.atis?.letter||data.atis?.atisCode||null,reportedAt:new Date().toISOString(),source:'ATIS Relay',available:!!raw};
+        ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=300'}})));
+        return respond(result);
+      }catch{return respond({error:'ATIS Relay request failed'},502)}
+    }
     if (url.pathname !== '/flight') return respond({error:'Not found'},404);
     const number = (url.searchParams.get('number') || '').replace(/^WN/i,'');
     const date = url.searchParams.get('date') || '';

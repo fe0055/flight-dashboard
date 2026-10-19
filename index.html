@@ -151,16 +151,6 @@ async function loadArrivalAtis(iata){
    if(runways.length&&fresh(config?.sourceTimeStamp)){display(runways,'FAA NAS Status',config.sourceTimeStamp);return;}
   }
  }catch(e){}
- // Free third-party D-ATIS parser; reject stale results and invalid runways.
- try{
-  const response=await fetch('https://runwaysinuse.com/api/v1/runway/'+icao,{cache:'no-store'});
-  if(response.ok){
-   const data=await response.json();
-   const runways=clean(data.arriving_runways);
-   const time=data.timestamp||data.last_updated;
-   if(runways.length&&fresh(time)){display(runways,'Runways in Use (D-ATIS parsed)',time);return;}
-  }
- }catch(e){}
  // Existing Worker D-ATIS endpoint remains the final fallback.
  try{
   const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/atis?icao='+icao,{cache:'no-store'});

@@ -1,6 +1,7 @@
 /**
  * Southwest flight lookup proxy for Flight Dashboard.
  * Deployment managed by GitHub Actions and Cloudflare Wrangler.
+ * Redeploy with configured AeroDataBox secret.
  * Cloudflare Worker secret: AERODATABOX_API_KEY
  * Set ALLOWED_ORIGIN to your GitHub Pages site, without trailing slash.
  */

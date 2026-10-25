@@ -93,14 +93,15 @@ async function boardGate(env, airport, date, number, direction, opposite) {
 }
 
 async function airlabsFallback(env, number, date) {
-  if (!env.AIRLABS_API_KEY) return null;
+  if (!env.AIRLABS_API_KEY) return {error:'airlabs_key_missing'};
   const endpoint = new URL('https://airlabs.co/api/v9/schedules');
   endpoint.searchParams.set('api_key', env.AIRLABS_API_KEY);
   endpoint.searchParams.set('flight_iata', 'WN' + Number(number));
   const response = await fetch(endpoint.toString());
-  if (!response.ok) return null;
+  if (!response.ok) return {error:'airlabs_http_error',airlabsStatus:response.status};
   const payload = await response.json();
-  if (payload.error || !Array.isArray(payload.response)) return null;
+  if (payload.error) return {error:'airlabs_api_error',airlabsCode:String(payload.error.code || payload.error.type || 'unknown').slice(0,80)};
+  if (!Array.isArray(payload.response)) return {error:'airlabs_unexpected_response'};
   const flights = payload.response.filter(f => {
     const flightCode = String(f.flight_iata || '').replace(/\s/g, '').toUpperCase();
     const scheduled = String(f.dep_time || f.dep_time_utc || '');
@@ -110,7 +111,7 @@ async function airlabsFallback(env, number, date) {
     departure: {iata:f.dep_iata || null, scheduled:f.dep_time || null, predicted:f.dep_estimated || null, runway:null, gate:f.dep_gate || null, terminal:f.dep_terminal || null},
     arrival: {iata:f.arr_iata || null, scheduled:f.arr_time || null, predicted:f.arr_estimated || null, runway:null, gate:f.arr_gate || null, terminal:f.arr_terminal || null}
   })).filter(f => /^[A-Z]{3}$/.test(f.departure.iata||'') && /^[A-Z]{3}$/.test(f.arrival.iata||''));
-  return flights.length ? {source:'AirLabs',retrievedAt:new Date().toISOString(),flights} : null;
+  return flights.length ? {source:'AirLabs',retrievedAt:new Date().toISOString(),flights} : {error:'airlabs_no_matching_flights',returnedCount:payload.response.length};
 }
 
 export default {
@@ -172,11 +173,11 @@ export default {
     const cached = await caches.default.match(cacheKey);
     if (cached) return respond(await cached.json(),200,{'X-Flight-Cache':'HIT'});
     try {
-      if (!env.AERODATABOX_API_KEY) { try { const alt=await airlabsFallback(env,number,date); if(alt)return respond(alt); } catch(e) {} return respond({error:'No flight data available'},502); }
+      if (!env.AERODATABOX_API_KEY) { try { const alt=await airlabsFallback(env,number,date); if(alt?.flights)return respond(alt); return respond({error:'No flight data available',airlabs:alt},502); } catch(e) {return respond({error:'AirLabs request failed'},502);}  }
       const upstream = await fetch(API_BASE+'/flights/number/WN'+Number(number)+'/'+date,{
         headers:{'X-RapidAPI-Key':env.AERODATABOX_API_KEY,'X-RapidAPI-Host':API_HOST}
       });
-      if (!upstream.ok) { try { const alt=await airlabsFallback(env,number,date); if(alt)return respond(alt); } catch(e) {} return respond({error:'Flight providers unavailable',providerStatus:upstream.status},502); }
+      if (!upstream.ok) { try { const alt=await airlabsFallback(env,number,date); if(alt?.flights)return respond(alt); return respond({error:'Flight providers unavailable',providerStatus:upstream.status,airlabs:alt},502); } catch(e) {return respond({error:'Flight providers unavailable',providerStatus:upstream.status,airlabs:{error:'airlabs_request_failed'}},502);}  }
       const raw = await upstream.json();
       const source = Array.isArray(raw) ? raw : [];
       const flights = source.map(f=>({
@@ -205,8 +206,8 @@ export default {
       })));
       return respond(result,200,{'X-Flight-Cache':'MISS'});
     } catch {
-      try { const alt=await airlabsFallback(env,number,date); if(alt)return respond(alt); } catch(e) {}
-      return respond({error:'Flight provider request failed'},502);
+      try { const alt=await airlabsFallback(env,number,date); if(alt?.flights)return respond(alt); return respond({error:'Flight provider request failed',airlabs:alt},502); } catch(e) {}
+      return respond({error:'Flight provider request failed',airlabs:{error:'airlabs_request_failed'}},502);
     }
   }
 };

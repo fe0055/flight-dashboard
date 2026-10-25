@@ -91,6 +91,28 @@ async function boardGate(env, airport, date, number, direction, opposite) {
   }
   return null;
 }
+
+async function airlabsFallback(env, number, date) {
+  if (!env.AIRLABS_API_KEY) return null;
+  const endpoint = new URL('https://airlabs.co/api/v9/schedules');
+  endpoint.searchParams.set('api_key', env.AIRLABS_API_KEY);
+  endpoint.searchParams.set('flight_iata', 'WN' + Number(number));
+  const response = await fetch(endpoint.toString());
+  if (!response.ok) return null;
+  const payload = await response.json();
+  if (payload.error || !Array.isArray(payload.response)) return null;
+  const flights = payload.response.filter(f => {
+    const flightCode = String(f.flight_iata || '').replace(/\\s/g, '').toUpperCase();
+    const scheduled = String(f.dep_time || f.dep_time_utc || '');
+    return flightCode === 'WN' + Number(number) && scheduled.slice(0,10) === date;
+  }).map(f => ({
+    number: 'WN' + Number(number), date, status: f.status || 'Unknown',
+    departure: {iata:f.dep_iata || null, scheduled:f.dep_time || null, predicted:f.dep_estimated || null, runway:null, gate:f.dep_gate || null, terminal:f.dep_terminal || null},
+    arrival: {iata:f.arr_iata || null, scheduled:f.arr_time || null, predicted:f.arr_estimated || null, runway:null, gate:f.arr_gate || null, terminal:f.arr_terminal || null}
+  })).filter(f => /^[A-Z]{3}$/.test(f.departure.iata||'') && /^[A-Z]{3}$/.test(f.arrival.iata||''));
+  return flights.length ? {source:'AirLabs',retrievedAt:new Date().toISOString(),flights} : null;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin');
@@ -144,16 +166,17 @@ export default {
     const date = url.searchParams.get('date') || '';
     if (!/^\d{1,5}$/.test(number) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date+'T00:00:00Z')))
       return respond({error:'Invalid flight number or date'},400);
-    if (!env.AERODATABOX_API_KEY) return respond({error:'API secret not configured'},503);
+    if (!env.AERODATABOX_API_KEY && !env.AIRLABS_API_KEY) return respond({error:'API secrets not configured'},503);
     // Cache repeated lookups for 15 minutes to conserve API quota.
     const cacheKey = new Request('https://flight-dashboard-cache.invalid/v3/'+date+'/WN'+Number(number));
     const cached = await caches.default.match(cacheKey);
     if (cached) return respond(await cached.json(),200,{'X-Flight-Cache':'HIT'});
     try {
+      if (!env.AERODATABOX_API_KEY) { const alt=await airlabsFallback(env,number,date); return alt?respond(alt):respond({error:'No flight data available'},502); }
       const upstream = await fetch(API_BASE+'/flights/number/WN'+Number(number)+'/'+date,{
         headers:{'X-RapidAPI-Key':env.AERODATABOX_API_KEY,'X-RapidAPI-Host':API_HOST}
       });
-      if (!upstream.ok) return respond({error:'Flight provider unavailable',providerStatus:upstream.status},502);
+      if (!upstream.ok) { const alt=await airlabsFallback(env,number,date); return alt?respond(alt):respond({error:'Flight providers unavailable',providerStatus:upstream.status},502); }
       const raw = await upstream.json();
       const source = Array.isArray(raw) ? raw : [];
       const flights = source.map(f=>({
@@ -182,6 +205,7 @@ export default {
       })));
       return respond(result,200,{'X-Flight-Cache':'MISS'});
     } catch {
+      try { const alt=await airlabsFallback(env,number,date); if(alt)return respond(alt); } catch(e) {}
       return respond({error:'Flight provider request failed'},502);
     }
   }

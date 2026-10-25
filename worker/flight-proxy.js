@@ -102,7 +102,7 @@ async function airlabsFallback(env, number, date) {
   const payload = await response.json();
   if (payload.error || !Array.isArray(payload.response)) return null;
   const flights = payload.response.filter(f => {
-    const flightCode = String(f.flight_iata || '').replace(/\\s/g, '').toUpperCase();
+    const flightCode = String(f.flight_iata || '').replace(/\s/g, '').toUpperCase();
     const scheduled = String(f.dep_time || f.dep_time_utc || '');
     return flightCode === 'WN' + Number(number) && scheduled.slice(0,10) === date;
   }).map(f => ({

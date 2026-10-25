@@ -172,11 +172,11 @@ export default {
     const cached = await caches.default.match(cacheKey);
     if (cached) return respond(await cached.json(),200,{'X-Flight-Cache':'HIT'});
     try {
-      if (!env.AERODATABOX_API_KEY) { const alt=await airlabsFallback(env,number,date); return alt?respond(alt):respond({error:'No flight data available'},502); }
+      if (!env.AERODATABOX_API_KEY) { try { const alt=await airlabsFallback(env,number,date); if(alt)return respond(alt); } catch(e) {} return respond({error:'No flight data available'},502); }
       const upstream = await fetch(API_BASE+'/flights/number/WN'+Number(number)+'/'+date,{
         headers:{'X-RapidAPI-Key':env.AERODATABOX_API_KEY,'X-RapidAPI-Host':API_HOST}
       });
-      if (!upstream.ok) { const alt=await airlabsFallback(env,number,date); return alt?respond(alt):respond({error:'Flight providers unavailable',providerStatus:upstream.status},502); }
+      if (!upstream.ok) { try { const alt=await airlabsFallback(env,number,date); if(alt)return respond(alt); } catch(e) {} return respond({error:'Flight providers unavailable',providerStatus:upstream.status},502); }
       const raw = await upstream.json();
       const source = Array.isArray(raw) ? raw : [];
       const flights = source.map(f=>({

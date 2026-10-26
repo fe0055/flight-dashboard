@@ -139,6 +139,27 @@ export default {
     if (request.method !== 'GET') return respond({error:'Method not allowed'},405);
     if (origin && origin !== ALLOWED_ORIGIN) return respond({error:'Origin not allowed'},403);
     const url = new URL(request.url);
+    if (url.pathname === '/airport-config') {
+      const airport=(url.searchParams.get('airport')||'').toUpperCase();
+      if(!/^[A-Z]{3}$/.test(airport))return respond({error:'Three-letter US airport code required'},400);
+      const cacheKey=new Request('https://flight-dashboard-cache.invalid/faa-config/v1/'+airport);
+      const cached=await caches.default.match(cacheKey);
+      if(cached)return respond(await cached.json());
+      try{
+        const upstream=await fetch('https://nasstatus.faa.gov/api/airport-events',{headers:{Accept:'application/json'}});
+        if(!upstream.ok)return respond({airport,available:false,reason:'FAA feed unavailable'},200);
+        const events=await upstream.json();
+        const event=Array.isArray(events)?events.find(x=>String(x.airportId||'').toUpperCase()===airport):null;
+        const config=event?.airportConfig;
+        const timestamp=config?.sourceTimeStamp||null;
+        const age=Date.now()-Date.parse(timestamp||'');
+        const fresh=Number.isFinite(age)&&age>=-120000&&age<=20*60000;
+        const extract=value=>[...new Set((String(value||'').toUpperCase().match(/\\b(?:0?[1-9]|[12][0-9]|3[0-6])[LRC]?\\b/g)||[]).map(x=>x.padStart(2,'0')))];
+        const result={airport,available:!!(config&&fresh),departureRunways:fresh?extract(config?.departureRunwayConfig):[],arrivalRunways:fresh?extract(config?.arrivalRunwayConfig):[],source:'FAA NAS Status',sourceTimeStamp:timestamp,disclaimer:'Airport-wide configuration only; not a flight-specific runway assignment'};
+        ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
+        return respond(result);
+      }catch(e){return respond({airport,available:false,reason:'FAA airport configuration lookup failed'},200);}
+    }
     if (url.pathname === '/atis') {
       const icao=(url.searchParams.get('icao')||'').toUpperCase();
       if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'US ICAO airport required'},400);

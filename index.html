@@ -23,7 +23,7 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
 #dateLine{margin-top:14px}
 @media(max-width:420px){#dashboard{padding:12px 9px 24px}.top{padding:15px 9px;gap:5px;grid-template-columns:minmax(0,1fr) minmax(118px,1.05fr) minmax(0,1fr)}.airport{font-size:27px}.time{font-size:20px}.line{font-size:12px}.wx{padding:9px 6px;font-size:11px}.wxrow{gap:4px}.flight{font-size:23px}.zulu{font-size:11px}.label{font-size:9px;letter-spacing:.5px}}
 
-#atisSource,#flightLookup,#importStatus,#dateLine{display:none!important}
+#atisSource,#flightLookup,#dateLine{display:none!important} #importStatus{display:block!important;margin:12px 0;padding:10px;border-radius:9px;font-size:12px;color:#d7e6f5;background:#22354a;overflow-wrap:anywhere}
 
 /* Flight number is the centered visual focus; keep live data unchanged */
 .center .flight{font-size:clamp(35px,6vw,52px);line-height:1.05;margin:7px 0 13px;letter-spacing:0;font-variant-numeric:tabular-nums}
@@ -199,21 +199,21 @@ async function loadCachedFlight(force=false){
  const cached=Array.isArray(saved.flights)&&saved.flights.length&&now-saved.time<30*60*1000;
  const cooldown=get(limitKey);
  const blocked=Number(cooldown.until)>now;
- if(blocked&&!cached){status.textContent='AeroDataBox rate limit · Retry after '+new Date(cooldown.until).toLocaleTimeString()+' · Saved flight details remain available';return;}
+ // Do not block Worker fallback to AirLabs when AeroDataBox is rate limited.
  flightLookupBusy=true;
  status.textContent=cached?'Using recently saved flight data…':'Looking up WN'+number+' for '+date+'…';
  try{
   let data;
-  if(cached&&(!force||blocked)){data=saved.flights;}
+  if(cached&&!force){data=saved.flights;}
   else{
    const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/flight?number='+encodeURIComponent(number)+'&date='+encodeURIComponent(date),{cache:'no-store'});
    data=await response.json();
    if(!response.ok){
-    if(response.status===429||data.providerStatus===429){
+    if(response.status===429){
      put(limitKey,{until:Date.now()+60*60*1000});
      if(Array.isArray(saved.flights)&&saved.flights.length){data=saved.flights;status.textContent='Rate limited · Showing saved flight data';}
      else throw Error('AeroDataBox quota reached · Please try again later');
-    }else throw Error(data.error||'Flight lookup failed ('+response.status+')');
+    }else throw Error((data.error||'Flight lookup failed ('+response.status+')')+(data.airlabs?' · AirLabs: '+JSON.stringify(data.airlabs):''));
    }else{
     const list=Array.isArray(data)?data:(Array.isArray(data.flights)?data.flights:[]);
     if(list.length)put(key,{time:Date.now(),flights:list});

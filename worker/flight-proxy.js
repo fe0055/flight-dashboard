@@ -102,12 +102,18 @@ async function airlabsFallback(env, number, date) {
   const payload = await response.json();
   if (payload.error) return {error:'airlabs_api_error',airlabsCode:String(payload.error.code || payload.error.type || 'unknown').slice(0,80)};
   if (!Array.isArray(payload.response)) return {error:'airlabs_unexpected_response'};
+  // Just after midnight, a flight that departed yesterday can still be active today.
+  // Only include that previous-day leg when its arrival date is the requested date.
+  const previousDate = new Date(Date.parse(date+'T00:00:00Z')-86400000).toISOString().slice(0,10);
   const flights = payload.response.filter(f => {
     const flightCode = String(f.flight_iata || '').replace(/\s/g, '').toUpperCase();
-    const scheduled = String(f.dep_time || f.dep_time_utc || '');
-    return flightCode === 'WN' + Number(number) && scheduled.slice(0,10) === date;
+    const departureDate = String(f.dep_time || f.dep_time_utc || '').slice(0,10);
+    const arrivalDate = String(f.arr_estimated || f.arr_actual || f.arr_time || '').slice(0,10);
+    const status = String(f.status || '').toLowerCase();
+    const overnightActive = departureDate === previousDate && arrivalDate === date && ['active','en-route','en_route','landed'].includes(status);
+    return flightCode === 'WN' + Number(number) && (departureDate === date || overnightActive);
   }).map(f => ({
-    number: 'WN' + Number(number), date, status: f.status || 'Unknown',
+    number: 'WN' + Number(number), date:String(f.dep_time || f.dep_time_utc || '').slice(0,10), status: f.status || 'Unknown',
     departure: {iata:f.dep_iata || null, scheduled:f.dep_time || null, predicted:f.dep_estimated || null, scheduledUtc:f.dep_time_utc || null, predictedUtc:f.dep_estimated_utc || null, actual:f.dep_actual || null, actualUtc:f.dep_actual_utc || null, runway:null, gate:f.dep_gate || null, terminal:f.dep_terminal || null},
     arrival: {iata:f.arr_iata || null, scheduled:f.arr_time || null, predicted:f.arr_estimated || null, scheduledUtc:f.arr_time_utc || null, predictedUtc:f.arr_estimated_utc || null, actual:f.arr_actual || null, actualUtc:f.arr_actual_utc || null, runway:null, gate:f.arr_gate || null, terminal:f.arr_terminal || null}
   })).filter(f => /^[A-Z]{3}$/.test(f.departure.iata||'') && /^[A-Z]{3}$/.test(f.arrival.iata||''));

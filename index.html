@@ -262,9 +262,9 @@ async function loadCachedFlight(force=false){
     if(actual.year!==year||actual.month!==month||actual.day!==day||actual.hour!==hour||actual.minute!==minute)return '';
     return new Date(utc).toISOString().slice(11,16)+'Z';
   };
-  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||localToZulu(dep.predicted||dep.scheduled,selectedDep)||'';
+  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||zulu(dep.predictedUtc)||zulu(dep.scheduledUtc)||localToZulu(dep.predicted||dep.scheduled,selectedDep)||'';
   record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock(arr.predicted)||clock((arr.scheduledTime||arr.scheduled)?.local)||clock(arr.scheduled)||'';
-  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||localToZulu(arr.predicted||arr.scheduled,selectedArr)||'';
+  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||zulu(arr.predictedUtc)||zulu(arr.scheduledUtc)||localToZulu(arr.predicted||arr.scheduled,selectedArr)||'';
   // Read gate assignments across common AeroDataBox response variants.
   // A terminal by itself is not a gate; never invent an assignment.
   const normalizeGate=(candidate,depth=0)=>{

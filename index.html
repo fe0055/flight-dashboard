@@ -242,9 +242,29 @@ async function loadCachedFlight(force=false){
   const clock=x=>{const m=String(x||'').match(/(?:T|\s)(\d{2}:\d{2})/);return m?m[1]:''};
   const zulu=x=>{const t=clock(x);return t?t+'Z':''};const dayOffset=(local,utc)=>{if(!local||!utc)return '';const a=new Date(local),b=new Date(utc);if(!Number.isFinite(a.getTime())||!Number.isFinite(b.getTime()))return '';const localDay=String(local).slice(0,10),utcDay=String(utc).slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(localDay)||!/^\d{4}-\d{2}-\d{2}$/.test(utcDay))return '';const diff=Math.round((Date.parse(utcDay+'T00:00:00Z')-Date.parse(localDay+'T00:00:00Z'))/86400000);return diff>0?' (Z +'+diff+'d)':diff<0?' (Z '+diff+'d)':''};
   record.etd=clock(dep.revisedTime?.local)||clock(dep.predicted)||clock((dep.scheduledTime||dep.scheduled)?.local)||clock(dep.scheduled)||'';
-  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||'';
+  // AirLabs schedule timestamps are airport-local without a UTC offset.
+  // Convert using airport IANA zones; handle DST and midnight crossings.
+  const airportZone={CMH:'America/New_York',MCO:'America/New_York'};
+  const zoneFor=iata=>airportZone[iata]||null;
+  const localToZulu=(value,iata)=>{
+    const zone=zoneFor(iata),match=String(value||'').match(/^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2})/);
+    if(!zone||!match)return '';
+    const [year,month,day,hour,minute]=match.slice(1).map(Number);
+    const wall=Date.UTC(year,month-1,day,hour,minute);
+    const fmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    let utc=wall;
+    for(let i=0;i<3;i++){
+      const p=Object.fromEntries(fmt.formatToParts(new Date(utc)).filter(x=>x.type!=='literal').map(x=>[x.type,Number(x.value)]));
+      const displayed=Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute);
+      utc+=wall-displayed;
+    }
+    const actual=Object.fromEntries(fmt.formatToParts(new Date(utc)).filter(x=>x.type!=='literal').map(x=>[x.type,Number(x.value)]));
+    if(actual.year!==year||actual.month!==month||actual.day!==day||actual.hour!==hour||actual.minute!==minute)return '';
+    return new Date(utc).toISOString().slice(11,16)+'Z';
+  };
+  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||localToZulu(dep.predicted||dep.scheduled,selectedDep)||'';
   record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock(arr.predicted)||clock((arr.scheduledTime||arr.scheduled)?.local)||clock(arr.scheduled)||'';
-  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||'';
+  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||localToZulu(arr.predicted||arr.scheduled,selectedArr)||'';
   // Read gate assignments across common AeroDataBox response variants.
   // A terminal by itself is not a gate; never invent an assignment.
   const normalizeGate=(candidate,depth=0)=>{

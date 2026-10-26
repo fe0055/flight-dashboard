@@ -108,8 +108,8 @@ async function airlabsFallback(env, number, date) {
     return flightCode === 'WN' + Number(number) && scheduled.slice(0,10) === date;
   }).map(f => ({
     number: 'WN' + Number(number), date, status: f.status || 'Unknown',
-    departure: {iata:f.dep_iata || null, scheduled:f.dep_time || null, predicted:f.dep_estimated || null, runway:null, gate:f.dep_gate || null, terminal:f.dep_terminal || null},
-    arrival: {iata:f.arr_iata || null, scheduled:f.arr_time || null, predicted:f.arr_estimated || null, runway:null, gate:f.arr_gate || null, terminal:f.arr_terminal || null}
+    departure: {iata:f.dep_iata || null, scheduled:f.dep_time || null, predicted:f.dep_estimated || null, scheduledUtc:f.dep_time_utc || null, predictedUtc:f.dep_estimated_utc || null, runway:null, gate:f.dep_gate || null, terminal:f.dep_terminal || null},
+    arrival: {iata:f.arr_iata || null, scheduled:f.arr_time || null, predicted:f.arr_estimated || null, scheduledUtc:f.arr_time_utc || null, predictedUtc:f.arr_estimated_utc || null, runway:null, gate:f.arr_gate || null, terminal:f.arr_terminal || null}
   })).filter(f => /^[A-Z]{3}$/.test(f.departure.iata||'') && /^[A-Z]{3}$/.test(f.arrival.iata||''));
   return flights.length ? {source:'AirLabs',retrievedAt:new Date().toISOString(),flights} : {error:'airlabs_no_matching_flights',returnedCount:payload.response.length};
 }

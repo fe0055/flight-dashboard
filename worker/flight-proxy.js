@@ -163,31 +163,44 @@ export default {
     if (url.pathname === '/atis') {
       const icao=(url.searchParams.get('icao')||'').toUpperCase();
       if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'US ICAO airport required'},400);
-      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-free/v1/'+icao);
+      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-free/v2/'+icao);
       const cached=await caches.default.match(cacheKey);
       if(cached)return respond(await cached.json());
       try{
         const upstream=await fetch('https://datis.clowd.io/api/'+icao,{headers:{Accept:'application/json'}});
         if(!upstream.ok)return respond({icao,available:false,reason:'D-ATIS source unavailable',source:'datis.clowd.io'},200);
         const data=await upstream.json();
-        const reports=Array.isArray(data)?data:[data];
-        const arrivals=reports.filter(x=>x&&/^(arrival|combined)$/i.test(String(x.type||'')));
-        const runways=[];
-        const add=v=>{const m=String(v).toUpperCase().match(/^(0?[1-9]|[12][0-9]|3[0-6])([LRC]?)$/);if(m){const n=m[1].padStart(2,'0')+m[2];if(!runways.includes(n))runways.push(n)}};
-        for(const report of arrivals){
-          const raw=String(report.datis||'').toUpperCase();
-          // Restrict extraction to explicit landing runway clauses, not general approach/runway mentions.
-          const clauses=raw.match(/(?:LANDING|ARRIVALS?)(?:\s+(?:RUNWAYS?|RWYS?))?\s+(?:ON|USING|IN USE|RUNWAYS?|RWYS?|RWY|ARE|IS|AND|,|\/|\s)*\s*((?:\d{1,2}[LRC]?\s*(?:,|\/|AND|&|\s)\s*)*\d{1,2}[LRC]?)/g)||[];
-          for(const clause of clauses){
-            const after=clause.replace(/^.*?(?:LANDING|ARRIVALS?)/,'');
-            for(const m of after.matchAll(/\b(\d{1,2}[LRC]?)\b/g))add(m[1]);
+        const reports=Array.isArray(data)?data:Array.isArray(data?.atis)?data.atis:Array.isArray(data?.reports)?data.reports:[data];
+        const arrivals=[],departures=[];
+        const add=(list,raw)=>{
+          for(const m of String(raw).toUpperCase().matchAll(/\b(?:0?[1-9]|[12]\d|3[0-6])[LRC]?\b/g)){
+            const token=m[0],match=token.match(/^(\d{1,2})([LRC]?)$/);
+            if(!match)continue;
+            const runway=match[1].padStart(2,'0')+match[2];
+            if(!list.includes(runway))list.push(runway);
           }
+        };
+        const extract=(raw,kind)=>{
+          // Only accept explicit runway-use clauses; never infer from approaches or wind.
+          const words=kind==='departure'?'(?:DEPARTURES?|DEPARTING|TAKEOFFS?|TAKE.OFF|DEP|TKOF)':'(?:ARRIVALS?|LANDING|LDG)';
+          const expression=new RegExp('\\b'+words+'\\b(?:\\s+(?:RUNWAYS?|RWYS?|RWY|ON|USING|IN|USE|ARE|IS|FOR|AND))*\\s*[:,-]?\\s*((?:(?:RUNWAYS?|RWYS?|RWY)\\s*)?(?:0?[1-9]|[12]\\d|3[0-6])[LRC]?(?:\\s*(?:,|\\/|&|AND|OR)\\s*(?:0?[1-9]|[12]\\d|3[0-6])[LRC]?)*)','gi');
+          for(const match of String(raw).matchAll(expression))add(kind==='departure'?departures:arrivals,match[1]);
+        };
+        for(const report of reports){
+          if(!report||typeof report!=='object')continue;
+          const type=String(report.type||report.atisType||'').toLowerCase();
+          const raw=String(report.datis||report.text||report.atis||'').toUpperCase();
+          if(!raw)continue;
+          if(/^(arr|arrival|combined|both)$/.test(type)||!type)extract(raw,'arrival');
+          if(/^(dep|departure|combined|both)$/.test(type)||!type)extract(raw,'departure');
         }
-        const letter=arrivals.find(x=>x.code)?.code||null;
-        const result={icao,runways,letter,available:runways.length>0,source:'datis.clowd.io',retrievedAt:new Date().toISOString(),disclaimer:'NOT FOR OPERATIONAL USE'};
+        const result={icao,arrivalRunways:arrivals,departureRunways:departures,runways:arrivals,
+          available:arrivals.length>0||departures.length>0,source:'datis.clowd.io',
+          retrievedAt:new Date().toISOString(),reportCount:reports.length,
+          disclaimer:'INFORMATIONAL ONLY - NOT FOR OPERATIONAL USE. VERIFY WITH CURRENT ATIS/ATC'};
         ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
         return respond(result);
-      }catch{return respond({icao,available:false,runways:[],source:'datis.clowd.io',reason:'D-ATIS fetch failed'},200)}
+      }catch{return respond({icao,available:false,arrivalRunways:[],departureRunways:[],source:'datis.clowd.io',reason:'D-ATIS fetch failed'},200)}
     }
     if (url.pathname !== '/flight') return respond({error:'Not found'},404);
     const number = (url.searchParams.get('number') || '').replace(/^WN/i,'');

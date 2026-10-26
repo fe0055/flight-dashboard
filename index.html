@@ -204,7 +204,7 @@ async function loadCachedFlight(force=false){
  status.textContent=cached?'Using recently saved flight data…':'Looking up WN'+number+' for '+date+'…';
  try{
   let data;
-  if(cached&&!force){data=saved.flights;}
+  if(cached&&!force){data={flights:saved.flights,source:saved.source||'Cached provider'};}
   else{
    const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/flight?number='+encodeURIComponent(number)+'&date='+encodeURIComponent(date),{cache:'no-store'});
    data=await response.json();
@@ -216,7 +216,7 @@ async function loadCachedFlight(force=false){
     }else throw Error((data.error||'Flight lookup failed ('+response.status+')')+(data.airlabs?' · AirLabs: '+JSON.stringify(data.airlabs):''));
    }else{
     const list=Array.isArray(data)?data:(Array.isArray(data.flights)?data.flights:[]);
-    if(list.length)put(key,{time:Date.now(),flights:list});
+    if(list.length)put(key,{time:Date.now(),flights:list,source:data.source||'AeroDataBox'});
    }
   }
   if(current!==number||day()!==date)return;
@@ -232,7 +232,7 @@ async function loadCachedFlight(force=false){
   const dep=f.departure||{},arr=f.arrival||{};
   if(!/^[A-Z]{3}$/.test((dep.airport?.iata||dep.iata||''))||!/^[A-Z]{3}$/.test((arr.airport?.iata||arr.iata||'')))throw Error('Airport information unavailable');
   const selectedDep=dep.airport?.iata||dep.iata,selectedArr=arr.airport?.iata||arr.iata;
-  const selectedSegment=selectedDep+'-'+selectedArr+'-'+String((dep.scheduledTime||dep.scheduled)?.utc||'').slice(0,16);
+  const selectedSegment=selectedDep+'-'+selectedArr+'-'+String((dep.scheduledTime||dep.scheduled)?.utc||dep.scheduled||'').slice(0,16);
   if(record._selectedSegment!==selectedSegment){
     record.depGate='';record.arrGate='';record.depRwy='';record.arrRwy='';
     record._gateSegment='';record._runwaySegment='';
@@ -241,9 +241,9 @@ async function loadCachedFlight(force=false){
   record.dep=selectedDep;record.arr=selectedArr;
   const clock=x=>{const m=String(x||'').match(/(?:T|\s)(\d{2}:\d{2})/);return m?m[1]:''};
   const zulu=x=>{const t=clock(x);return t?t+'Z':''};const dayOffset=(local,utc)=>{if(!local||!utc)return '';const a=new Date(local),b=new Date(utc);if(!Number.isFinite(a.getTime())||!Number.isFinite(b.getTime()))return '';const localDay=String(local).slice(0,10),utcDay=String(utc).slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(localDay)||!/^\d{4}-\d{2}-\d{2}$/.test(utcDay))return '';const diff=Math.round((Date.parse(utcDay+'T00:00:00Z')-Date.parse(localDay+'T00:00:00Z'))/86400000);return diff>0?' (Z +'+diff+'d)':diff<0?' (Z '+diff+'d)':''};
-  record.etd=clock(dep.revisedTime?.local)||clock((dep.scheduledTime||dep.scheduled)?.local)||'';
+  record.etd=clock(dep.revisedTime?.local)||clock(dep.predicted)||clock((dep.scheduledTime||dep.scheduled)?.local)||clock(dep.scheduled)||'';
   record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||'';
-  record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock((arr.scheduledTime||arr.scheduled)?.local)||'';
+  record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock(arr.predicted)||clock((arr.scheduledTime||arr.scheduled)?.local)||clock(arr.scheduled)||'';
   record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||'';
   // Read gate assignments across common AeroDataBox response variants.
   // A terminal by itself is not a gate; never invent an assignment.
@@ -328,7 +328,7 @@ async function loadCachedFlight(force=false){
   }
   airborne=next;updateDuration();
   put('flight_'+date+'_WN'+number,record);show();
-  status.textContent='AeroDataBox · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||data.retrievedAt||'time unknown')+'. Verify operational details with Southwest.'; el('gateDiagnostic').textContent='Gate feed: '+record.dep+' '+(departureGate||'not supplied by provider')+' → '+record.arr+' '+(arrivalGate||'not supplied by provider')+' · '+flights.length+' segment(s) · '+(departureGate||arrivalGate?'API gate data received':'No gate assignment in flight response');
+  status.textContent=(data.source||'AeroDataBox')+' · '+(f.status||'Status unavailable')+' · Updated '+(f.lastUpdatedUtc||data.retrievedAt||'time unknown')+'. Verify operational details with Southwest.'; el('gateDiagnostic').textContent='Gate feed: '+record.dep+' '+(departureGate||'not supplied by provider')+' → '+record.arr+' '+(arrivalGate||'not supplied by provider')+' · '+flights.length+' segment(s) · '+(departureGate||arrivalGate?'API gate data received':'No gate assignment in flight response');
  }catch(e){status.textContent='Automatic lookup unavailable: '+e.message+'. Enter airport codes under Edit details to check runway configuration.';el('gateDiagnostic').textContent='Gate feed error: '+e.message;el('runwayDiagnostic').textContent='Flight runway feed unavailable · Airport runway configuration can be checked separately';el('gateFallback').style.display='flex';if(record.arr)loadArrivalAtis(record.arr).catch(()=>{});}finally{flightLookupBusy=false;}
 }
 

@@ -193,7 +193,7 @@ function chooseFlightLeg(flights){
 let flightLookupBusy=false;
 async function loadCachedFlight(force=false){
  const status=el('importStatus'),number=current,date=day();
- const key='api_flights_'+date+'_WN'+number,limitKey='flight_api_cooldown';
+ const key='api_flights_v2_'+date+'_WN'+number,limitKey='flight_api_cooldown';
  if(flightLookupBusy){status.textContent='Flight lookup already running';return;}
  const saved=get(key),now=Date.now();
  const cached=Array.isArray(saved.flights)&&saved.flights.length&&now-saved.time<30*60*1000;

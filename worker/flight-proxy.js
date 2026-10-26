@@ -163,44 +163,55 @@ export default {
     if (url.pathname === '/atis') {
       const icao=(url.searchParams.get('icao')||'').toUpperCase();
       if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'US ICAO airport required'},400);
-      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-free/v2/'+icao);
+      if(!env.ATISRELAY_API_KEY)return respond({icao,available:false,reason:'ATIS Relay secret not configured',source:'ATIS Relay'},200);
+      const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-relay/v1/'+icao);
       const cached=await caches.default.match(cacheKey);
       if(cached)return respond(await cached.json());
-      try{
-        const upstream=await fetch('https://datis.clowd.io/api/'+icao,{headers:{Accept:'application/json'}});
-        if(!upstream.ok)return respond({icao,available:false,reason:'D-ATIS source unavailable',source:'datis.clowd.io'},200);
+      try {
+        const upstream=await fetch('https://atisrelay.com/api/atis?icao='+icao,{
+          headers:{'X-Api-Key':env.ATISRELAY_API_KEY,Accept:'application/json','User-Agent':'FlightDashboard/1.24 (personal aviation dashboard)'}
+        });
+        if(!upstream.ok)return respond({icao,available:false,source:'ATIS Relay',reason:upstream.status===429?'ATIS Relay rate limit reached':'ATIS Relay returned HTTP '+upstream.status},200);
         const data=await upstream.json();
-        const reports=Array.isArray(data)?data:Array.isArray(data?.atis)?data.atis:Array.isArray(data?.reports)?data.reports:[data];
-        const arrivals=[],departures=[];
-        const add=(list,raw)=>{
-          for(const m of String(raw).toUpperCase().matchAll(/\b(?:0?[1-9]|[12]\d|3[0-6])[LRC]?\b/g)){
-            const token=m[0],match=token.match(/^(\d{1,2})([LRC]?)$/);
-            if(!match)continue;
-            const runway=match[1].padStart(2,'0')+match[2];
-            if(!list.includes(runway))list.push(runway);
+        const arrivalRunways=[],departureRunways=[];
+        const parseRunways=(text,kind)=>{
+          // Extract only runway-use clauses. Approach listings and runway closures are not runway assignments.
+          const rx=kind==='departure'
+            ? /\b(?:DEPARTURES?|TAKEOFFS?|TAKE OFF|DEP)\s*(?:(?:RUNWAYS?|RWYS?|RWY|ON|USING|IN USE|ARE|IS|FOR)\s*){0,4}((?:(?:RWYS?|RUNWAYS?)\s*)?(?:0?[1-9]|[12]\d|3[0-6])[LRC]?(?:\s*(?:,|\/|&|AND)\s*(?:0?[1-9]|[12]\d|3[0-6])[LRC]?)*)/gi
+            : /\b(?:ARRIVALS?|LANDING|LDG)\s*(?:(?:RUNWAYS?|RWYS?|RWY|ON|USING|IN USE|ARE|IS|FOR)\s*){0,4}((?:(?:RWYS?|RUNWAYS?)\s*)?(?:0?[1-9]|[12]\d|3[0-6])[LRC]?(?:\s*(?:,|\/|&|AND)\s*(?:0?[1-9]|[12]\d|3[0-6])[LRC]?)*)/gi;
+          const found=[];
+          for(const match of String(text||'').toUpperCase().matchAll(rx)){
+            for(const token of match[1].match(/\b(?:0?[1-9]|[12]\d|3[0-6])[LRC]?\b/g)||[]){
+              const m=token.match(/^(\d{1,2})([LRC]?)$/);
+              if(m){const runway=m[1].padStart(2,'0')+m[2];if(!found.includes(runway))found.push(runway);}
+            }
           }
+          return found;
         };
-        const extract=(raw,kind)=>{
-          // Only accept explicit runway-use clauses; never infer from approaches or wind.
-          const words=kind==='departure'?'(?:DEPARTURES?|DEPARTING|TAKEOFFS?|TAKE.OFF|DEP|TKOF)':'(?:ARRIVALS?|LANDING|LDG)';
-          const expression=new RegExp('\\b'+words+'\\b(?:\\s+(?:RUNWAYS?|RWYS?|RWY|ON|USING|IN|USE|ARE|IS|FOR|AND))*\\s*[:,-]?\\s*((?:(?:RUNWAYS?|RWYS?|RWY)\\s*)?(?:0?[1-9]|[12]\\d|3[0-6])[LRC]?(?:\\s*(?:,|\\/|&|AND|OR)\\s*(?:0?[1-9]|[12]\\d|3[0-6])[LRC]?)*)','gi');
-          for(const match of String(raw).matchAll(expression))add(kind==='departure'?departures:arrivals,match[1]);
-        };
-        for(const report of reports){
+        const reports=[['arrival',data.arrival],['departure',data.departure],['combined',data.atis]];
+        const reportMeta=[];
+        for(const [type,report] of reports){
           if(!report||typeof report!=='object')continue;
-          const type=String(report.type||report.atisType||'').toLowerCase();
-          const raw=String(report.datis||report.text||report.atis||'').toUpperCase();
+          const raw=String(report.dataBody||report.text||report.datis||'');
           if(!raw)continue;
-          if(/^(arr|arrival|combined|both)$/.test(type)||!type)extract(raw,'arrival');
-          if(/^(dep|departure|combined|both)$/.test(type)||!type)extract(raw,'departure');
+          if(type!=='departure')for(const r of parseRunways(raw,'arrival'))if(!arrivalRunways.includes(r))arrivalRunways.push(r);
+          if(type!=='arrival')for(const r of parseRunways(raw,'departure'))if(!departureRunways.includes(r))departureRunways.push(r);
+          const timestamp=Number(report.timestamp);
+          const issuedAt=Number.isFinite(timestamp)&&timestamp>1e12?new Date(timestamp).toISOString():null;
+          reportMeta.push({type,letter:report.letter||report.atisCode||null,issuedAt});
         }
-        const result={icao,arrivalRunways:arrivals,departureRunways:departures,runways:arrivals,
-          available:arrivals.length>0||departures.length>0,source:'datis.clowd.io',
-          retrievedAt:new Date().toISOString(),reportCount:reports.length,
-          disclaimer:'INFORMATIONAL ONLY - NOT FOR OPERATIONAL USE. VERIFY WITH CURRENT ATIS/ATC'};
+        // Never present unverified or stale ATIS as current runway information.
+        const newest=reportMeta.map(x=>Date.parse(x.issuedAt||'')).filter(Number.isFinite).sort((x,y)=>y-x)[0];
+        const age=Date.now()-newest;
+        const fresh=Number.isFinite(age)&&age>=-120000&&age<=90*60000;
+        const result={icao,arrivalRunways:fresh?arrivalRunways:[],departureRunways:fresh?departureRunways:[],
+          runways:fresh?arrivalRunways:[],available:fresh&&(arrivalRunways.length>0||departureRunways.length>0),
+          source:'ATIS Relay',retrievedAt:new Date().toISOString(),issuedAt:Number.isFinite(newest)?new Date(newest).toISOString():null,
+          reports:reportMeta,reason:!fresh?'ATIS timestamp unavailable or stale':null,
+          notice:'Unofficial. Not for operational use. Confirm on frequency.',attribution:'https://atisrelay.com/'};
         ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
         return respond(result);
-      }catch{return respond({icao,available:false,arrivalRunways:[],departureRunways:[],source:'datis.clowd.io',reason:'D-ATIS fetch failed'},200)}
+      }catch(e){return respond({icao,available:false,arrivalRunways:[],departureRunways:[],source:'ATIS Relay',reason:'ATIS Relay request failed'},200);}
     }
     if (url.pathname !== '/flight') return respond({error:'Not found'},404);
     const number = (url.searchParams.get('number') || '').replace(/^WN/i,'');

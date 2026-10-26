@@ -150,10 +150,10 @@ export default {
         for(const report of arrivals){
           const raw=String(report.datis||'').toUpperCase();
           // Restrict extraction to explicit landing runway clauses, not general approach/runway mentions.
-          const clauses=raw.match(/(?:LANDING|ARRIVALS?)(?:\\s+(?:RUNWAYS?|RWYS?))?\\s+(?:ON|USING|IN USE|RUNWAYS?|RWYS?|RWY|ARE|IS|AND|,|\\/|\\s)*\\s*((?:\\d{1,2}[LRC]?\\s*(?:,|\\/|AND|&|\\s)\\s*)*\\d{1,2}[LRC]?)/g)||[];
+          const clauses=raw.match(/(?:LANDING|ARRIVALS?)(?:\s+(?:RUNWAYS?|RWYS?))?\s+(?:ON|USING|IN USE|RUNWAYS?|RWYS?|RWY|ARE|IS|AND|,|\/|\s)*\s*((?:\d{1,2}[LRC]?\s*(?:,|\/|AND|&|\s)\s*)*\d{1,2}[LRC]?)/g)||[];
           for(const clause of clauses){
             const after=clause.replace(/^.*?(?:LANDING|ARRIVALS?)/,'');
-            for(const m of after.matchAll(/\\b(\\d{1,2}[LRC]?)\\b/g))add(m[1]);
+            for(const m of after.matchAll(/\b(\d{1,2}[LRC]?)\b/g))add(m[1]);
           }
         }
         const letter=arrivals.find(x=>x.code)?.code||null;

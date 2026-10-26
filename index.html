@@ -114,14 +114,14 @@ document.addEventListener('visibilitychange',()=>{
  if(document.visibilityState==='visible'&&gateReturnPending&&current){
   gateReturnPending=false;
   el('gateDiagnostic').textContent='Refreshing gate information…';
-  loadCachedFlight().catch(err=>{el('gateDiagnostic').textContent='Gate refresh error: '+err.message;});
+  loadCachedFlight(true).catch(err=>{el('gateDiagnostic').textContent='Gate refresh error: '+err.message;});
  }
 });
 window.addEventListener('focus',()=>{
  if(gateReturnPending&&current&&document.visibilityState==='visible'){
   gateReturnPending=false;
   el('gateDiagnostic').textContent='Refreshing gate information…';
-  loadCachedFlight().catch(err=>{el('gateDiagnostic').textContent='Gate refresh error: '+err.message;});
+  loadCachedFlight(true).catch(err=>{el('gateDiagnostic').textContent='Gate refresh error: '+err.message;});
  }
 });
 // Airport-wide runway configuration only. Never substitute for assigned landing runway.
@@ -193,10 +193,10 @@ function chooseFlightLeg(flights){
 let flightLookupBusy=false;
 async function loadCachedFlight(force=false){
  const status=el('importStatus'),number=current,date=day();
- const key='api_flights_v2_'+date+'_WN'+number,limitKey='flight_api_cooldown';
+ const key='api_flights_v3_'+date+'_WN'+number,limitKey='flight_api_cooldown';
  if(flightLookupBusy){status.textContent='Flight lookup already running';return;}
  const saved=get(key),now=Date.now();
- const cached=Array.isArray(saved.flights)&&saved.flights.length&&now-saved.time<30*60*1000;
+ const cached=Array.isArray(saved.flights)&&saved.flights.length&&now-saved.time<5*60*1000;
  const cooldown=get(limitKey);
  const blocked=Number(cooldown.until)>now;
  // Do not block Worker fallback to AirLabs when AeroDataBox is rate limited.
@@ -247,7 +247,7 @@ async function loadCachedFlight(force=false){
   const airportZone={CMH:'America/New_York',MCO:'America/New_York'};
   const zoneFor=iata=>airportZone[iata]||null;
   const localToZulu=(value,iata)=>{
-    const zone=zoneFor(iata),match=String(value||'').match(/^(\\d{4})-(\\d{2})-(\\d{2})[ T](\\d{2}):(\\d{2})/);
+    const zone=zoneFor(iata),match=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
     if(!zone||!match)return '';
     const [year,month,day,hour,minute]=match.slice(1).map(Number);
     const wall=Date.UTC(year,month-1,day,hour,minute);
@@ -262,9 +262,9 @@ async function loadCachedFlight(force=false){
     if(actual.year!==year||actual.month!==month||actual.day!==day||actual.hour!==hour||actual.minute!==minute)return '';
     return new Date(utc).toISOString().slice(11,16)+'Z';
   };
-  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||zulu(dep.predictedUtc)||zulu(dep.scheduledUtc)||localToZulu(dep.predicted||dep.scheduled,selectedDep)||'';
+  record.etdZulu=zulu(dep.revisedTime?.utc)||zulu((dep.scheduledTime||dep.scheduled)?.utc)||zulu(dep.actualUtc)||zulu(dep.predictedUtc)||zulu(dep.scheduledUtc)||localToZulu(dep.actual||dep.predicted||dep.scheduled,selectedDep)||'';
   record.eta=clock(arr.revisedTime?.local)||clock((arr.predictedTime||arr.predicted)?.local)||clock(arr.predicted)||clock((arr.scheduledTime||arr.scheduled)?.local)||clock(arr.scheduled)||'';
-  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||zulu(arr.predictedUtc)||zulu(arr.scheduledUtc)||localToZulu(arr.predicted||arr.scheduled,selectedArr)||'';
+  record.etaZulu=zulu(arr.revisedTime?.utc)||zulu((arr.predictedTime||arr.predicted)?.utc)||zulu((arr.scheduledTime||arr.scheduled)?.utc)||zulu(arr.actualUtc)||zulu(arr.predictedUtc)||zulu(arr.scheduledUtc)||localToZulu(arr.actual||arr.predicted||arr.scheduled,selectedArr)||'';
   // Read gate assignments across common AeroDataBox response variants.
   // A terminal by itself is not a gate; never invent an assignment.
   const normalizeGate=(candidate,depth=0)=>{

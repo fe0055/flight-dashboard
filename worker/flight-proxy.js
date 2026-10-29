@@ -196,8 +196,10 @@ export default {
           if(!raw)continue;
           if(type!=='departure')for(const r of parseRunways(raw,'arrival'))if(!arrivalRunways.includes(r))arrivalRunways.push(r);
           if(type!=='arrival')for(const r of parseRunways(raw,'departure'))if(!departureRunways.includes(r))departureRunways.push(r);
-          const timestamp=Number(report.timestamp);
-          const issuedAt=Number.isFinite(timestamp)&&timestamp>1e12?new Date(timestamp).toISOString():null;
+          const rawTimestamp=report.timestamp??report.issuedAt??report.updatedAt??report.time;
+          const numeric=Number(rawTimestamp);
+          const parsed=Number.isFinite(numeric)&&numeric>0?(numeric<1e11?numeric*1000:numeric):Date.parse(String(rawTimestamp||''));
+          const issuedAt=Number.isFinite(parsed)&&parsed>0?new Date(parsed).toISOString():null;
           reportMeta.push({type,letter:report.letter||report.atisCode||null,issuedAt});
         }
         // Never present unverified or stale ATIS as current runway information.

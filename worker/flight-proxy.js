@@ -192,7 +192,7 @@ export default {
         const reportMeta=[];
         for(const [type,report] of reports){
           if(!report||typeof report!=='object')continue;
-          const raw=String(report.dataBody||report.text||report.datis||'');
+          const raw=String(report.dataBody||report.text||report.datis||report.transcript||'');
           if(!raw)continue;
           if(type!=='departure')for(const r of parseRunways(raw,'arrival'))if(!arrivalRunways.includes(r))arrivalRunways.push(r);
           if(type!=='arrival')for(const r of parseRunways(raw,'departure'))if(!departureRunways.includes(r))departureRunways.push(r);
@@ -200,7 +200,7 @@ export default {
           const numeric=Number(rawTimestamp);
           const parsed=Number.isFinite(numeric)&&numeric>0?(numeric<1e11?numeric*1000:numeric):Date.parse(String(rawTimestamp||''));
           const issuedAt=Number.isFinite(parsed)&&parsed>0?new Date(parsed).toISOString():null;
-          reportMeta.push({type,letter:report.letter||report.atisCode||null,issuedAt});
+          reportMeta.push({type,letter:report.letter||report.atisCode||null,issuedAt,textAvailable:!!raw,textLength:raw.length,arrivalMatches:parseRunways(raw,'arrival').length,departureMatches:parseRunways(raw,'departure').length});
         }
         // Never present unverified or stale ATIS as current runway information.
         const newest=reportMeta.map(x=>Date.parse(x.issuedAt||'')).filter(Number.isFinite).sort((x,y)=>y-x)[0];

@@ -195,6 +195,13 @@ export default {
           if(!report||typeof report!=='object')continue;
           const raw=String(report.dataBody||report.text||report.datis||report.transcript||'');
           if(!raw)continue;
+          // FAA-style combined ATIS: "LNDG AND DEPG RWY 13R".
+          const combinedUse=/\\bLNDG\\s+AND\\s+DEPG\\s+(?:RWY|RUNWAY)\\s+((?:0?[1-9]|[12]\\d|3[0-6])[LRC]?)\\b/gi;
+          for(const match of raw.toUpperCase().matchAll(combinedUse)){
+            const r=match[1].replace(/^(\\d)([LRC]?)$/,'0$1$2');
+            if(!arrivalRunways.includes(r))arrivalRunways.push(r);
+            if(!departureRunways.includes(r))departureRunways.push(r);
+          }
           if(type!=='departure')for(const r of parseRunways(raw,'arrival'))if(!arrivalRunways.includes(r))arrivalRunways.push(r);
           if(type!=='arrival')for(const r of parseRunways(raw,'departure'))if(!departureRunways.includes(r))departureRunways.push(r);
           const rawTimestamp=report.timestamp??report.issuedAt??report.updatedAt??report.time;

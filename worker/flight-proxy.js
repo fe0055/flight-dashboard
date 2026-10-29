@@ -196,7 +196,7 @@ export default {
           const raw=String(report.dataBody||report.text||report.datis||report.transcript||'');
           if(!raw)continue;
           // FAA-style combined ATIS: "LNDG AND DEPG RWY 13R".
-          const combinedUse=/\\bLNDG\\s+AND\\s+DEPG\\s+(?:RWY|RUNWAY)\\s+((?:0?[1-9]|[12]\\d|3[0-6])[LRC]?)\\b/gi;
+          const combinedUse=/\bLNDG\s+AND\s+DEPG\s+(?:RWY|RUNWAY)\s+((?:0?[1-9]|[12]\d|3[0-6])[LRC]?)\b/gi;
           for(const match of raw.toUpperCase().matchAll(combinedUse)){
             const r=match[1].replace(/^(\\d)([LRC]?)$/,'0$1$2');
             if(!arrivalRunways.includes(r))arrivalRunways.push(r);

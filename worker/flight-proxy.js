@@ -191,6 +191,7 @@ export default {
         };
         const reports=[['arrival',data.arrival],['departure',data.departure],['combined',data.atis]];
         const reportMeta=[];
+        const approaches=[];
         for(const [type,report] of reports){
           if(!report||typeof report!=='object')continue;
           const raw=String(report.dataBody||report.text||report.datis||report.transcript||'');
@@ -212,6 +213,16 @@ export default {
             const r=match[1].replace(/^(\d)([LRC]?)$/,'0$1$2');
             if(!departureRunways.includes(r))departureRunways.push(r);
           }
+          // Capture only explicitly announced approaches, not generic runway mentions.
+          if(type!=='departure'){
+            const upper=raw.toUpperCase();
+            const rx=/\b(ILS|RNAV(?:\s*\(GPS\))?|RNP(?:\s+AR)?|LOC|LDA|VOR|VISUAL)\s+(?:(?:APPROACH(?:ES)?|APCH(?:ES)?)\s+)?(?:TO\s+)?(?:RWY|RY|RUNWAY)?\s*((?:0?[1-9]|[12]\d|3[0-6])[LRC]?)\b/g;
+            for(const m of upper.matchAll(rx)){
+              const runway=m[2].replace(/^(\d)([LRC]?)$/,'0$1$2');
+              const procedure=m[1].replace(/\s+/g,' ').trim()+' '+runway;
+              if(!approaches.some(a=>a.procedure===procedure))approaches.push({runway,procedure});
+            }
+          }
           if(type!=='departure')for(const r of parseRunways(raw,'arrival'))if(!arrivalRunways.includes(r))arrivalRunways.push(r);
           if(type!=='arrival')for(const r of parseRunways(raw,'departure'))if(!departureRunways.includes(r))departureRunways.push(r);
           const rawTimestamp=report.timestamp??report.issuedAt??report.updatedAt??report.time;
@@ -225,7 +236,7 @@ export default {
         const age=Date.now()-newest;
         const fresh=Number.isFinite(age)&&age>=-120000&&age<=90*60000;
         const result={icao,arrivalRunways:fresh?arrivalRunways:[],departureRunways:fresh?departureRunways:[],
-          runways:fresh?arrivalRunways:[],available:fresh&&(arrivalRunways.length>0||departureRunways.length>0),
+          runways:fresh?arrivalRunways:[],approaches:fresh?approaches:[],available:fresh&&(arrivalRunways.length>0||departureRunways.length>0),
           source:'ATIS Relay',retrievedAt:new Date().toISOString(),issuedAt:Number.isFinite(newest)?new Date(newest).toISOString():null,
           reports:reportMeta,reason:!fresh?'ATIS timestamp unavailable or stale':null,
           notice:'Unofficial. Not for operational use. Confirm on frequency.',attribution:'https://atisrelay.com/'};

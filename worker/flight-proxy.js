@@ -227,7 +227,7 @@ export default {
         const result={icao,arrivalRunways:fresh?arrivalRunways:[],departureRunways:fresh?departureRunways:[],
           runways:fresh?arrivalRunways:[],available:fresh&&(arrivalRunways.length>0||departureRunways.length>0),
           source:'ATIS Relay',retrievedAt:new Date().toISOString(),issuedAt:Number.isFinite(newest)?new Date(newest).toISOString():null,
-          reports:reportMeta,diagnosticText: url.searchParams.get('debug')==='1'?reports.map(([type,report])=>({type,text:String(report?.dataBody||report?.text||report?.datis||report?.transcript||'').slice(0,4000)})):undefined,reason:!fresh?'ATIS timestamp unavailable or stale':null,
+          reports:reportMeta,reason:!fresh?'ATIS timestamp unavailable or stale':null,
           notice:'Unofficial. Not for operational use. Confirm on frequency.',attribution:'https://atisrelay.com/'};
         if(!debug)ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
         return respond(result);

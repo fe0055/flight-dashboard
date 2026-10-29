@@ -164,8 +164,9 @@ export default {
       const icao=(url.searchParams.get('icao')||'').toUpperCase();
       if(!/^K[A-Z]{3}$/.test(icao))return respond({error:'US ICAO airport required'},400);
       if(!env.ATISRELAY_API_KEY)return respond({icao,available:false,reason:'ATIS Relay secret not configured',source:'ATIS Relay'},200);
+      const debug=url.searchParams.get('debug')==='1';
       const cacheKey=new Request('https://flight-dashboard-cache.invalid/atis-relay/v1/'+icao);
-      const cached=await caches.default.match(cacheKey);
+      const cached=debug?null:await caches.default.match(cacheKey);
       if(cached)return respond(await cached.json());
       try {
         const upstream=await fetch('https://atisrelay.com/api/atis?icao='+icao,{
@@ -211,7 +212,7 @@ export default {
           source:'ATIS Relay',retrievedAt:new Date().toISOString(),issuedAt:Number.isFinite(newest)?new Date(newest).toISOString():null,
           reports:reportMeta,diagnosticText: url.searchParams.get('debug')==='1'?reports.map(([type,report])=>({type,text:String(report?.dataBody||report?.text||report?.datis||report?.transcript||'').slice(0,4000)})):undefined,reason:!fresh?'ATIS timestamp unavailable or stale':null,
           notice:'Unofficial. Not for operational use. Confirm on frequency.',attribution:'https://atisrelay.com/'};
-        ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
+        if(!debug)ctx.waitUntil(caches.default.put(cacheKey,new Response(JSON.stringify(result),{headers:{'Cache-Control':'public, max-age=120'}})));
         return respond(result);
       }catch(e){return respond({icao,available:false,arrivalRunways:[],departureRunways:[],source:'ATIS Relay',reason:'ATIS Relay request failed'},200);}
     }

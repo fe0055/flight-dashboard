@@ -202,6 +202,16 @@ export default {
             if(!arrivalRunways.includes(r))arrivalRunways.push(r);
             if(!departureRunways.includes(r))departureRunways.push(r);
           }
+          // ATIS shorthand: "LND RY 22" and "DEPART RY 13".
+          // Only parse explicit landing/departure clauses, never NOTAM runway references.
+          for(const match of raw.toUpperCase().matchAll(/\b(?:LND|LNDG|LANDING)\s+(?:RY|RWY|RUNWAY)\s+((?:0?[1-9]|[12]\d|3[0-6])[LRC]?)\b/g)){
+            const r=match[1].replace(/^(\d)([LRC]?)$/,'0$1$2');
+            if(!arrivalRunways.includes(r))arrivalRunways.push(r);
+          }
+          for(const match of raw.toUpperCase().matchAll(/\b(?:DEPART|DEPG|DEPARTURE)\s+(?:RY|RWY|RUNWAY)\s+((?:0?[1-9]|[12]\d|3[0-6])[LRC]?)\b/g)){
+            const r=match[1].replace(/^(\d)([LRC]?)$/,'0$1$2');
+            if(!departureRunways.includes(r))departureRunways.push(r);
+          }
           if(type!=='departure')for(const r of parseRunways(raw,'arrival'))if(!arrivalRunways.includes(r))arrivalRunways.push(r);
           if(type!=='arrival')for(const r of parseRunways(raw,'departure'))if(!departureRunways.includes(r))departureRunways.push(r);
           const rawTimestamp=report.timestamp??report.issuedAt??report.updatedAt??report.time;

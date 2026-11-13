@@ -23,7 +23,7 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
 #dateLine{margin-top:14px}
 @media(max-width:420px){#dashboard{padding:12px 9px 24px}.top{padding:15px 9px;gap:5px;grid-template-columns:minmax(0,1fr) minmax(118px,1.05fr) minmax(0,1fr)}.airport{font-size:27px}.time{font-size:20px}.line{font-size:12px}.wx{padding:9px 6px;font-size:11px}.wxrow{gap:4px}.flight{font-size:23px}.zulu{font-size:11px}.label{font-size:9px;letter-spacing:.5px}}
 
-#atisSource,#flightLookup,#dateLine{display:none!important}#runwayDiagnostic,#gateDiagnostic{display:none!important} #runwayDiagnostic,#gateDiagnostic{display:none!important} #importStatus{display:block!important;margin:12px 0;padding:10px;border-radius:9px;font-size:12px;color:#d7e6f5;background:#22354a;overflow-wrap:anywhere}
+#atisSource,#flightLookup,#dateLine{display:none!important}#gateDiagnostic{display:none!important} #gateDiagnostic{display:none!important} #importStatus{display:block!important;margin:12px 0;padding:10px;border-radius:9px;font-size:12px;color:#d7e6f5;background:#22354a;overflow-wrap:anywhere}
 
 /* Flight number is the centered visual focus; keep live data unchanged */
 .center .flight{font-size:clamp(35px,6vw,52px);line-height:1.05;margin:7px 0 13px;letter-spacing:0;font-variant-numeric:tabular-nums}
@@ -50,7 +50,7 @@ body{background:radial-gradient(ellipse at top,#1a3047 0%,#101923 65%);min-heigh
 
 /* v1.34: keep diagnostic runway configurations and provider status in background */
 #airportConfigs,#atisRunways,#importStatus{display:none!important}
-.atisLetter{font-size:12px;color:#9fb9d0;letter-spacing:.4px;margin-top:4px;min-height:14px}</style></head><body><div id="flightPicker" class="flightPicker" hidden role="dialog" aria-modal="true" aria-labelledby="flightPickerTitle"><div class="flightPickerCard"><h2 class="flightPickerTitle" id="flightPickerTitle">Select your flight</h2><div id="flightPickerOptions" class="flightPickerOptions"></div><button type="button" id="flightPickerCancel" class="flightPickerCancel">Cancel</button></div></div><section id="home"><span class="appVersion" aria-label="App version 1.41">v1.41</span><form class="entry" id="flightForm"><h1>Flight Dashboard</h1><div class="hint">Flight</div><input id="number" type="text" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4" autocomplete="off" aria-label="Flight number" placeholder="" required><button id="open" type="submit">Open</button><div id="message" class="hint" role="status"></div></form></section><main id="dashboard"><div class="top"><div><div class="label">ORIGIN</div><div class="airport" id="dep">—</div><div class="line">Gate <b id="depGate">—</b></div><div class="label">ETD · LOCAL</div><div class="time" id="etd">—</div><div class="zulu" id="etdZulu">— Z</div><div class="label rwy">RUNWAY</div><div id="depRwy">—</div><div id="depAtisLetter" class="atisLetter"></div></div><div class="center"><div class="label">FLIGHT</div><div class="flight" id="flight">—</div><div class="wx" id="weatherRefresh" role="button" tabindex="0" aria-label="Refresh destination weather" title="Tap to refresh weather"><div class="wxname" id="wxName">Destination weather</div><div class="wxrow"><span>☁</span><span id="cloud">—</span></div><div class="wxrow"><span>🌡</span><span id="temp">—</span></div><div class="wxrow"><span id="windArrow" style="display:inline-block;transform:rotate(0deg)">↑</span><span id="wind">—</span></div><div id="weatherAge" style="font-size:10px;color:#9eb7cc;text-align:right;margin-top:5px"></div></div></div><div class="right"><div class="label">DESTINATION</div><div class="airport" id="arr">—</div><div class="line">Gate <b id="arrGate">—</b></div><div class="label">ETA · LOCAL</div><div class="time" id="eta">—</div><div class="zulu" id="etaZulu">— Z</div><div class="label rwy">RUNWAY</div><div id="arrRwy">—</div><div id="arrAtisLetter" class="atisLetter"></div></div></div><div id="runwayDiagnostic" class="notice" style="margin:10px 5px" role="status">Runway feed not checked yet</div><div id="airportConfigs" class="atisRunways" style="display:none" role="status" aria-live="polite"></div><div id="atisRunways" class="atisRunways" style="display:none" role="status" aria-live="polite"></div><section class="duration" aria-label="Airborne flight duration"><div class="durationHead"><strong>AIRBORNE TIME</strong><span id="durationType" class="durationBadge">AWAITING DATA</span></div><div class="durationPrimary"><div class="durationPrimaryLabel">REMAINING</div><div class="durationPrimaryValue" id="durationRemainingBig">—</div></div><div class="durationTrack" role="progressbar" aria-label="Estimated flight progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="durationProgress"><div class="durationFill" id="durationFill"></div><span class="durationPlane" id="durationPlane" aria-hidden="true">✈</span></div><div class="durationFoot"><span id="durationElapsed">Elapsed —</span><span class="durationValue" id="durationValue">Total flight —</span></div></section><p style="display:none" class="notice" id="atisSource" style="margin:12px 0 0;display:none"></p><p style="display:none" class="notice" id="flightLookup" style="margin:12px 0 0"></p><p id="gateDiagnostic" class="notice" style="margin:8px 4px">Gate feed not checked yet</p><div class="actions" id="gateFallback" style="display:none;margin-top:8px"><a id="airlineGateLookup" target="_blank" rel="noopener noreferrer" style="display:block;width:100%;text-align:center;padding:13px 10px;border:1px solid #6789ac;border-radius:12px;color:#cce4ff;text-decoration:none;font-weight:700" href="https://www.southwest.com/air/flight-status/">Check gates on Southwest ↗</a></div><p style="display:none" class="notice" id="importStatus" role="status">Flight lookup uses AeroDataBox through Cloudflare.</p><div class="actions"><button id="back" class="secondary" type="button">Back</button><button id="editButton" type="button">Edit details</button></div><p style="display:none" class="notice" id="dateLine"></p><section class="scratch" aria-label="Handwritten flight notes"><div class="scratchbar"><strong>Flight notes</strong><button type="button" id="penTool" class="active">✎ Pen</button><button type="button" id="eraserTool">Eraser</button><button type="button" id="clearNotes">Clear</button></div><label class="scratchsettings" for="scratchBrightness">☾ Brightness <input id="scratchBrightness" type="range" min="5" max="100" step="5" value="25"><output id="scratchBrightnessValue">25%</output></label><canvas id="noteCanvas" aria-label="Write flight notes using Apple Pencil or finger"></canvas><small>Saved on this device for this flight and date.</small></section><details class="panel" id="editor"><summary>Flight details (manual)</summary><div class="fields" id="fields"></div><button id="save" type="button" style="width:100%;margin-top:14px">Save</button></details></main><script>
+.atisLetter{font-size:12px;color:#9fb9d0;letter-spacing:.4px;margin-top:4px;min-height:14px}</style></head><body><div id="flightPicker" class="flightPicker" hidden role="dialog" aria-modal="true" aria-labelledby="flightPickerTitle"><div class="flightPickerCard"><h2 class="flightPickerTitle" id="flightPickerTitle">Select your flight</h2><div id="flightPickerOptions" class="flightPickerOptions"></div><button type="button" id="flightPickerCancel" class="flightPickerCancel">Cancel</button></div></div><section id="home"><span class="appVersion" aria-label="App version 1.42">v1.42</span><form class="entry" id="flightForm"><h1>Flight Dashboard</h1><div class="hint">Flight</div><input id="number" type="text" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4" autocomplete="off" aria-label="Flight number" placeholder="" required><button id="open" type="submit">Open</button><div id="message" class="hint" role="status"></div></form></section><main id="dashboard"><div class="top"><div><div class="label">ORIGIN</div><div class="airport" id="dep">—</div><div class="line">Gate <b id="depGate">—</b></div><div class="label">ETD · LOCAL</div><div class="time" id="etd">—</div><div class="zulu" id="etdZulu">— Z</div><div class="label rwy">RUNWAY</div><div id="depRwy">—</div><div id="depAtisLetter" class="atisLetter"></div></div><div class="center"><div class="label">FLIGHT</div><div class="flight" id="flight">—</div><div class="wx" id="weatherRefresh" role="button" tabindex="0" aria-label="Refresh destination weather" title="Tap to refresh weather"><div class="wxname" id="wxName">Destination weather</div><div class="wxrow"><span>☁</span><span id="cloud">—</span></div><div class="wxrow"><span>🌡</span><span id="temp">—</span></div><div class="wxrow"><span id="windArrow" style="display:inline-block;transform:rotate(0deg)">↑</span><span id="wind">—</span></div><div id="weatherAge" style="font-size:10px;color:#9eb7cc;text-align:right;margin-top:5px"></div></div></div><div class="right"><div class="label">DESTINATION</div><div class="airport" id="arr">—</div><div class="line">Gate <b id="arrGate">—</b></div><div class="label">ETA · LOCAL</div><div class="time" id="eta">—</div><div class="zulu" id="etaZulu">— Z</div><div class="label rwy">RUNWAY</div><div id="arrRwy">—</div><div id="arrAtisLetter" class="atisLetter"></div></div></div><div id="runwayDiagnostic" class="notice" style="margin:10px 5px" role="status">Runway feed not checked yet</div><div id="airportConfigs" class="atisRunways" style="display:none" role="status" aria-live="polite"></div><div id="atisRunways" class="atisRunways" style="display:none" role="status" aria-live="polite"></div><section class="duration" aria-label="Airborne flight duration"><div class="durationHead"><strong>AIRBORNE TIME</strong><span id="durationType" class="durationBadge">AWAITING DATA</span></div><div class="durationPrimary"><div class="durationPrimaryLabel">REMAINING</div><div class="durationPrimaryValue" id="durationRemainingBig">—</div></div><div class="durationTrack" role="progressbar" aria-label="Estimated flight progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="durationProgress"><div class="durationFill" id="durationFill"></div><span class="durationPlane" id="durationPlane" aria-hidden="true">✈</span></div><div class="durationFoot"><span id="durationElapsed">Elapsed —</span><span class="durationValue" id="durationValue">Total flight —</span></div></section><p style="display:none" class="notice" id="atisSource" style="margin:12px 0 0;display:none"></p><p style="display:none" class="notice" id="flightLookup" style="margin:12px 0 0"></p><p id="gateDiagnostic" class="notice" style="margin:8px 4px">Gate feed not checked yet</p><div class="actions" id="gateFallback" style="display:none;margin-top:8px"><a id="airlineGateLookup" target="_blank" rel="noopener noreferrer" style="display:block;width:100%;text-align:center;padding:13px 10px;border:1px solid #6789ac;border-radius:12px;color:#cce4ff;text-decoration:none;font-weight:700" href="https://www.southwest.com/air/flight-status/">Check gates on Southwest ↗</a></div><p style="display:none" class="notice" id="importStatus" role="status">Flight lookup uses AeroDataBox through Cloudflare.</p><div class="actions"><button id="back" class="secondary" type="button">Back</button><button id="editButton" type="button">Edit details</button></div><p style="display:none" class="notice" id="dateLine"></p><section class="scratch" aria-label="Handwritten flight notes"><div class="scratchbar"><strong>Flight notes</strong><button type="button" id="penTool" class="active">✎ Pen</button><button type="button" id="eraserTool">Eraser</button><button type="button" id="clearNotes">Clear</button></div><label class="scratchsettings" for="scratchBrightness">☾ Brightness <input id="scratchBrightness" type="range" min="5" max="100" step="5" value="25"><output id="scratchBrightnessValue">25%</output></label><canvas id="noteCanvas" aria-label="Write flight notes using Apple Pencil or finger"></canvas><small>Saved on this device for this flight and date.</small></section><details class="panel" id="editor"><summary>Flight details (manual)</summary><div class="fields" id="fields"></div><button id="save" type="button" style="width:100%;margin-top:14px">Save</button></details></main><script>
 (function(){'use strict';const el=id=>document.getElementById(id), keys={dep:'Origin (IATA)',arr:'Destination (IATA)',depGate:'Origin gate',arrGate:'Destination gate',etd:'ETD local (HH:MM)',etdZulu:'ETD Zulu (HH:MMZ)',eta:'ETA local (HH:MM)',etaZulu:'ETA Zulu (HH:MMZ)',depRwy:'Departure RWYs',arrRwy:'Landing RWYs'};let current='',record={},airborne=null;const validUtc=x=>{const t=typeof x==='string'?Date.parse(x):NaN;return Number.isFinite(t)?t:null};const minutes=x=>Math.max(0,Math.round(x/60000));const formatDuration=m=>Number.isFinite(m)?Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m':'—';function computeFlightProgress(a,now){
  if(!a)return {used:null,progress:0,complete:false,overdue:false};
  const total=Math.max(1,a.total);
@@ -163,79 +163,63 @@ window.addEventListener('focus',()=>{
  }
 });
 // Airport-wide runway configuration only. Never substitute for assigned landing runway.
+let airportConfigRequest=0;
 async function loadAirportConfigs(dep,arr){
- const panel=el('airportConfigs');
- if(!panel)return;
- panel.style.display='block';
- panel.textContent='Checking FAA airport runway configurations…';
- const airports=[{iata:dep,kind:'departure',field:'departureRunways'},{iata:arr,kind:'arrival',field:'arrivalRunways'}].filter(x=>/^[A-Z]{3}$/.test(x.iata||''));
+ const request=++airportConfigRequest;
+ const worker='https://flight-dashboard-api.fe005.workers.dev';
+ const airports=[{iata:dep,kind:'departure',field:'departureRunways',target:'depRwy',letter:'depAtisLetter'},{iata:arr,kind:'arrival',field:'arrivalRunways',target:'arrRwy',letter:'arrAtisLetter'}].filter(x=>/^[A-Z]{3}$/.test(x.iata||''));
+ const stillCurrent=()=>request===airportConfigRequest&&record.dep===dep&&record.arr===arr&&current;
+ const fetchJson=async url=>{try{const response=await fetch(url,{cache:'no-store'});if(!response.ok)return {error:'HTTP '+response.status};return await response.json();}catch(e){return {error:String(e.message||e)}}};
  const results=await Promise.all(airports.map(async x=>{
-   try{
-     const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/airport-config?airport='+encodeURIComponent(x.iata),{cache:'no-store'});
-     if(!response.ok)throw Error('unavailable');
-     return {...x,data:await response.json()};
-   }catch{return {...x,data:{available:false}}}
+   const [atis,faa]=await Promise.all([
+     fetchJson(worker+'/atis?icao='+encodeURIComponent(x.iata==='ANC'?'PA'+x.iata:x.iata==='HNL'?'PH'+x.iata:'K'+x.iata)),
+     fetchJson(worker+'/airport-config?airport='+encodeURIComponent(x.iata))
+   ]);
+   return {...x,atis,faa};
  }));
- if(record.dep!==dep||record.arr!==arr)return;
- panel.replaceChildren();
- for(const result of results){
-   const line=document.createElement('div');
-   const runways=result.data?.available?result.data[result.field]||[]:[];
-   line.textContent=result.iata+' '+(result.kind==='departure'?'departure':'arrival')+' configuration: '+(runways.length?runways.join(' / '):'not available');
-   panel.appendChild(line);
- }
- // Check the D-ATIS text feed for runway use when FAA NAS does not report it.
- const datis=await Promise.all(airports.map(async x=>{
-   try{
-     const response=await fetch('https://flight-dashboard-api.fe005.workers.dev/atis?icao=K'+x.iata,{cache:'no-store'});
-     const data=await response.json();
-     return {iata:x.iata,kind:x.kind,data};
-   }catch{return {iata:x.iata,kind:x.kind,data:null};}
- }));
- if(record.dep!==dep||record.arr!==arr)return;
- for(const x of datis){
-   const key=x.kind==='departure'?'departureRunways':'arrivalRunways';
-   const source=x.data?.[key]||(x.kind==='arrival'?x.data?.runways:null);
-   const rwys=x.data?.available&&Array.isArray(source)?source.filter(r=>!!validAirportRunway(x.iata,r)):[];
-   if(!rwys.length)continue;
-   const line=document.createElement('div');
-   line.textContent=x.iata+' · D-ATIS '+(x.kind==='departure'?'departure':'landing')+' runways in use: '+rwys.join(' / ');
-   panel.appendChild(line);
- }
- const note=document.createElement('small');
- note.textContent='Airport-wide configurations only · D-ATIS feed may be delayed or unavailable · Never an assigned runway · Verify current ATIS and ATC';
- panel.appendChild(note);
- // Display airport-wide departure and arrival runways, never flight-assigned runways.
- for(const x of airports){
-   const faa=results.find(r=>r.iata===x.iata)?.data;
-   const atis=datis.find(r=>r.iata===x.iata)?.data;
-   const field=x.kind==='departure'?'depRwy':'arrRwy';
-   const target=el(field),letterTarget=el(x.kind==='departure'?'depAtisLetter':'arrAtisLetter');
-   const stamp=atis?.issuedAt||atis?.timestamp||atis?.updatedAt;
-   const age=Date.now()-Date.parse(stamp||'');
-   const atisFresh=atis?.available&&Number.isFinite(age)&&age>=-120000&&age<=90*60000;
-   const letter=atis?.reports?.find(r=>r.letter)?.letter;
-   if(letterTarget)letterTarget.textContent=atisFresh&&/^[A-Z]$/.test(letter||'')?'ATIS '+letter:'';
-   const key=x.kind==='departure'?'departureRunways':'arrivalRunways';
-   const candidates=[
-     {data:atis,runways:atis?.[key]||(x.kind==='arrival'?atis?.runways:null),source:'D-ATIS',maxAge:90*60000},
-     {data:faa,runways:faa?.[x.field],source:'FAA configuration',maxAge:20*60000}
+ if(!stillCurrent())return;
+ const diagnostic=[];
+ const timestampOf=data=>data?.issuedAt||data?.sourceTimeStamp||data?.timestamp||data?.updatedAt||data?.observedAt||data?.last_updated||data?.retrievedAt||data?.reports?.[0]?.issuedAt||data?.reports?.[0]?.timestamp;
+ const parseStamp=value=>{
+   if(typeof value==='number')return value<1e11?value*1000:value;
+   if(typeof value!=='string'||!value.trim())return NaN;
+   if(/^\\d{10,13}$/.test(value.trim())){const n=Number(value);return n<1e11?n*1000:n;}
+   return Date.parse(value);
+ };
+ const normalizeList=(value,iata)=>{
+   if(!value)return [];
+   const items=Array.isArray(value)?value:typeof value==='string'?value.split(/[,/;]+/):[];
+   return [...new Set(items.map(v=>validAirportRunway(iata,typeof v==='object'?(v?.name||v?.number||v?.designator||''):String(v).replace(/^RWY\\s*/i,''))).filter(Boolean))];
+ };
+ for(const x of results){
+   const {atis,faa}=x;
+   const key=x.field;
+   const sources=[
+     {name:'D-ATIS',data:atis,value:atis?.[key]||(x.kind==='arrival'?atis?.runways:null),maxAge:90*60000},
+     {name:'FAA',data:faa,value:faa?.[key],maxAge:20*60000}
    ];
-   const fresh=candidates.find(c=>{
-     const t=c.data?.issuedAt||c.data?.sourceTimeStamp||c.data?.timestamp||c.data?.updatedAt||c.data?.observedAt;
-     const delta=Date.now()-Date.parse(t||'');
-     return c.data?.available&&Array.isArray(c.runways)&&c.runways.length&&Number.isFinite(delta)&&delta>=-120000&&delta<=c.maxAge;
-   });
-   const rwys=fresh?[...new Set(fresh.runways.map(r=>validAirportRunway(x.iata,r)).filter(Boolean))]:[];
-   target.textContent=rwys.length?rwys.join(' / '):'N/A';
-   target.title=rwys.length?fresh.source+' · airport runways in use, not flight assignment':'Current airport runway configuration unavailable';
-   target.setAttribute('aria-label',target.title+(rwys.length?': '+rwys.join(', '):''));
-   if(x.kind==='arrival'&&rwys.length&&atisFresh&&Array.isArray(atis.approaches)){
-     const procedures=atis.approaches.filter(p=>p&&rwys.includes(validAirportRunway(x.iata,p.runway))&&typeof p.procedure==='string');
-     if(procedures.length===1)target.title+=' · '+procedures[0].procedure;
+   let selected=null,reason='no runway data';
+   for(const source of sources){
+     const rwys=normalizeList(source.value,x.iata);
+     if(!rwys.length){reason=source.name+': no runway list'+(source.data?.error?' ('+source.data.error+')':'');continue;}
+     const time=parseStamp(timestampOf(source.data));
+     const age=Date.now()-time;
+     if(!Number.isFinite(age)){reason=source.name+': timestamp missing';continue;}
+     if(age< -120000||age>source.maxAge){reason=source.name+': stale ('+Math.round(age/60000)+' min)';continue;}
+     selected={...source,rwys,age};break;
    }
+   const target=el(x.target),letterTarget=el(x.letter);
+   target.textContent=selected?selected.rwys.join(' / '):'N/A';
+   target.title=selected?selected.name+' · airport-wide runways in use · '+Math.max(0,Math.round(selected.age/60000))+' min old':'Runway unavailable: '+reason;
+   target.setAttribute('aria-label',target.title);
+   const letter=atis?.reports?.find(report=>report.letter)?.letter||atis?.letter;
+   const atisAge=Date.now()-parseStamp(timestampOf(atis));
+   letterTarget.textContent=/^[A-Z]$/.test(letter||'')&&atisAge>=-120000&&atisAge<=90*60000?'ATIS '+letter:'';
+   diagnostic.push(x.iata+' '+(selected?selected.name+' '+selected.rwys.join('/')+' ('+Math.round(selected.age/60000)+'m)':reason));
  }
-
+ const diag=el('runwayDiagnostic');
+ diag.textContent='Runway sources: '+diagnostic.join(' · ');
+ diag.style.display=results.some(x=>el(x.target).textContent==='N/A')?'block':'none';
 }
 async function loadArrivalAtis(iata){
  const panel=el('atisRunways');
@@ -446,7 +430,6 @@ async function loadCachedFlight(force=false){
   record.depRwy='';record.arrRwy='';
   const runwayFieldNames=side=>['runway','actualRunway','runwayName','runwayNumber','takeoffRunway','landingRunway','runwayInfo'].filter(k=>side[k]!=null&&side[k]!=='');
   el('runwayDiagnostic').textContent='Runway feed: '+record.dep+' '+(departureRunway||'not supplied')+' → '+record.arr+' '+(arrivalRunway||'not supplied')+' · Provider fields: departure ['+(runwayFieldNames(dep).join(', ')||'none')+'], arrival ['+(runwayFieldNames(arr).join(', ')||'none')+']';
-  loadAirportConfigs(record.dep,record.arr).catch(()=>{});
   // Use actual runway timestamps for airborne time; never use gate times as takeoff.
   const timeOf=v=>{if(typeof v==='number')return v>1e12?v:v>1e9?v*1000:null;if(typeof v==='string')return validUtc(v);if(!v||typeof v!=='object')return null;return timeOf(v.utc)||timeOf(v.dateTime)||timeOf(v.time)||timeOf(v.value)||timeOf(v.actualUtc)||timeOf(v.actualTime)||null;};
   const takeoff=timeOf(dep.runwayTime?.actual)||timeOf(dep.runwayTime?.actualUtc)||timeOf(dep.runwayTime)||timeOf(dep.actualRunwayTime)||timeOf(dep.takeoffTime?.actual)||timeOf(dep.takeoffTime)||timeOf(dep.actualTakeoffUtc)||timeOf(dep.actualTakeoffTime)||timeOf(dep.actualRunwayDepartureTime);
